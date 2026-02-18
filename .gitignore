@@ -4,3 +4,5 @@ VIDEOS/
 download_archive.txt
 clear_db.sh
 config/db_config.env
+data.sql
+tmp/

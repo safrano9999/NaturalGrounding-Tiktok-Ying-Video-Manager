@@ -47,7 +47,7 @@ CREATE TABLE `accounts` (
 /*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
 /*!50003 SET sql_mode              = 'STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION' */ ;
 DELIMITER ;;
-/*!50003 CREATE*/ /*!50017 DEFINER=`ngdb`@`%`*/ /*!50003 TRIGGER after_account_blacklist
+/*!50003 CREATE*/ /*!50017 /*!50003 TRIGGER after_account_blacklist
 AFTER UPDATE ON accounts
 FOR EACH ROW
 BEGIN
@@ -122,7 +122,7 @@ CREATE TABLE `presort_queue` (
   `video_id` int(11) NOT NULL,
   PRIMARY KEY (`queue_pos`),
   KEY `video_id` (`video_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=8192 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=32768 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -194,7 +194,7 @@ CREATE TABLE `videos` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `video_id` (`video_id`),
   KEY `idx_videos_is_valid` (`is_valid`)
-) ENGINE=InnoDB AUTO_INCREMENT=29860 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=31784 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -205,7 +205,7 @@ CREATE TABLE `videos` (
 /*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
 /*!50003 SET sql_mode              = 'STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION' */ ;
 DELIMITER ;;
-/*!50003 CREATE*/ /*!50017 DEFINER=`ngdb`@`%`*/ /*!50003 TRIGGER trg_videos_count_inc
+/*!50003 CREATE*/ /*!50017 /*!50003 TRIGGER trg_videos_count_inc
 AFTER INSERT ON videos
 FOR EACH ROW
 BEGIN
@@ -228,7 +228,7 @@ DELIMITER ;
 /*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
 /*!50003 SET sql_mode              = 'STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION' */ ;
 DELIMITER ;;
-/*!50003 CREATE*/ /*!50017 DEFINER=`ngdb`@`%`*/ /*!50003 TRIGGER trigger_video_finished
+/*!50003 CREATE*/ /*!50017 /*!50003 TRIGGER trigger_video_finished
 AFTER UPDATE ON videos
 FOR EACH ROW
 BEGIN
@@ -258,6 +258,297 @@ DELIMITER ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
 
 --
+-- Dumping routines for database 'ngdb'
+--
+/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
+/*!50003 SET sql_mode              = 'STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION' */ ;
+/*!50003 DROP PROCEDURE IF EXISTS `fill_playlist_queue` */;
+/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
+/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
+/*!50003 SET @saved_col_connection = @@collation_connection */ ;
+/*!50003 SET character_set_client  = utf8mb4 */ ;
+/*!50003 SET character_set_results = utf8mb4 */ ;
+/*!50003 SET collation_connection  = utf8mb4_uca1400_ai_ci */ ;
+DELIMITER ;;
+CREATE PROCEDURE `fill_playlist_queue`()
+BEGIN
+    TRUNCATE TABLE playlist_queue;
+    UPDATE presort_state SET current_pos = 1 WHERE id = 1;
+    UPDATE accounts SET video_count = 0;
+
+    
+    INSERT INTO playlist_queue (video_id, account_id, rel_path, sort_order)
+    SELECT
+        v_id,
+        acc_id,
+        v_path,
+        ROW_NUMBER() OVER (ORDER BY row_num ASC, rand_order ASC)
+    FROM (
+        SELECT
+            v.id AS v_id,
+            a.account_id AS acc_id,
+            v.rel_path AS v_path,
+            ROW_NUMBER() OVER (
+                PARTITION BY a.account_id
+                ORDER BY v.id ASC
+            ) as row_num,
+            ar.rand_order
+        FROM videos v
+        JOIN accounts a ON v.account = a.username
+        JOIN (
+            SELECT account_id, RAND() AS rand_order
+            FROM accounts
+            WHERE is_valid = 1
+        ) ar ON a.account_id = ar.account_id
+        CROSS JOIN playlist_config c ON c.id = 1
+        WHERE a.is_valid = 1
+          AND v.is_physical = 1
+
+          AND (
+              (v.status = 'sehr_gut' AND IFNULL(c.use_sehr_gut, 0) = 1) OR
+              (v.status = 'gut'      AND IFNULL(c.use_gut, 0) = 1) OR
+              (v.status = 'e3'       AND IFNULL(c.use_e3_status, 0) = 1) OR
+              (v.status = 'pending'  AND IFNULL(c.use_pending, 0) = 1)
+          )
+
+          AND (
+              (IFNULL(c.use_mode1, 0) = 0 OR v.mode1 = 1) AND
+              (IFNULL(c.use_mode2, 0) = 0 OR v.mode2 = 1)
+          )
+
+          AND (c.time_gt IS NULL OR v.duration >= c.time_gt)
+          AND (c.time_lt IS NULL OR v.duration <= c.time_lt)
+          AND (c.min_width IS NULL OR v.width >= c.min_width)
+          AND (v.used_count <= IFNULL(c.max_used, 0))
+          AND (c.only_rot IS NULL OR c.only_rot = 0 OR v.is_transformed = c.only_rot)
+    ) as rotation
+    WHERE row_num <= (SELECT IFNULL(max_per_acc, 999) FROM playlist_config WHERE id = 1)
+    ORDER BY row_num ASC, rand_order ASC;
+
+    UPDATE accounts a
+    SET a.video_count = (
+        SELECT COUNT(*)
+        FROM playlist_queue q
+        WHERE q.account_id = a.account_id
+    );
+END ;;
+DELIMITER ;
+/*!50003 SET sql_mode              = @saved_sql_mode */ ;
+/*!50003 SET character_set_client  = @saved_cs_client */ ;
+/*!50003 SET character_set_results = @saved_cs_results */ ;
+/*!50003 SET collation_connection  = @saved_col_connection */ ;
+/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
+/*!50003 SET sql_mode              = 'STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION' */ ;
+/*!50003 DROP PROCEDURE IF EXISTS `get_cleanup_preview` */;
+/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
+/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
+/*!50003 SET @saved_col_connection = @@collation_connection */ ;
+/*!50003 SET character_set_client  = utf8mb4 */ ;
+/*!50003 SET character_set_results = utf8mb4 */ ;
+/*!50003 SET collation_connection  = utf8mb4_uca1400_ai_ci */ ;
+DELIMITER ;;
+CREATE PROCEDURE `get_cleanup_preview`()
+BEGIN
+
+    SELECT
+        'TOTAL' as category,
+        COUNT(*) as count,
+        SUM(CASE WHEN is_physical = 1 THEN 1 ELSE 0 END) as on_disk
+    FROM videos v
+    LEFT JOIN accounts a ON v.account = a.username
+    WHERE (v.status = 'unbrauchbar' AND v.is_physical = 1)
+       OR (v.status = 'pending' AND v.is_physical = 1 AND a.is_valid = 0)
+
+    UNION ALL
+
+    SELECT
+        'Unbrauchbar (alle)',
+        COUNT(*),
+        SUM(CASE WHEN is_physical = 1 THEN 1 ELSE 0 END)
+    FROM videos
+    WHERE status = 'unbrauchbar'
+
+    UNION ALL
+
+    SELECT
+        'Pending (geblockt)',
+        COUNT(*),
+        SUM(CASE WHEN v.is_physical = 1 THEN 1 ELSE 0 END)
+    FROM videos v
+    JOIN accounts a ON v.account = a.username
+    WHERE a.is_valid = 0 AND v.status = 'pending';
+
+
+    SELECT
+        v.account,
+        CASE WHEN a.is_valid = 1 THEN '✓' ELSE '✗' END as aktiv,
+        SUM(CASE WHEN v.status = 'unbrauchbar' AND v.is_physical = 1 THEN 1 ELSE 0 END) as unbrauchbar,
+        SUM(CASE WHEN v.status = 'pending' AND v.is_physical = 1 AND a.is_valid = 0 THEN 1 ELSE 0 END) as pending,
+        SUM(CASE WHEN v.status = 'unbrauchbar' AND v.is_physical = 1 THEN 1
+                 WHEN v.status = 'pending' AND v.is_physical = 1 AND a.is_valid = 0 THEN 1
+                 ELSE 0 END) as gesamt
+    FROM videos v
+    JOIN accounts a ON v.account = a.username
+    GROUP BY v.account, a.is_valid
+    HAVING gesamt > 0
+    ORDER BY gesamt DESC
+    LIMIT 20;
+END ;;
+DELIMITER ;
+/*!50003 SET sql_mode              = @saved_sql_mode */ ;
+/*!50003 SET character_set_client  = @saved_cs_client */ ;
+/*!50003 SET character_set_results = @saved_cs_results */ ;
+/*!50003 SET collation_connection  = @saved_col_connection */ ;
+/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
+/*!50003 SET sql_mode              = 'STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION' */ ;
+/*!50003 DROP PROCEDURE IF EXISTS `get_cleanup_summary` */;
+/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
+/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
+/*!50003 SET @saved_col_connection = @@collation_connection */ ;
+/*!50003 SET character_set_client  = utf8mb4 */ ;
+/*!50003 SET character_set_results = utf8mb4 */ ;
+/*!50003 SET collation_connection  = utf8mb4_uca1400_ai_ci */ ;
+DELIMITER ;;
+CREATE PROCEDURE `get_cleanup_summary`()
+BEGIN
+    SELECT
+        'Videos (gesamt)' as info,
+        COUNT(*) as anzahl
+    FROM videos
+
+    UNION ALL
+
+    SELECT
+        'Physisch auf Disk',
+        COUNT(*)
+    FROM videos WHERE is_physical = 1
+
+    UNION ALL
+
+    SELECT
+        'Gelöscht (tracked)',
+        COUNT(*)
+    FROM videos WHERE is_physical = 0
+
+    UNION ALL
+
+    SELECT
+        '  └─ Unbrauchbar',
+        COUNT(*)
+    FROM videos WHERE status = 'unbrauchbar' AND is_physical = 0
+
+    UNION ALL
+
+    SELECT
+        '  └─ Pending (geblockt)',
+        COUNT(*)
+    FROM videos v
+    JOIN accounts a ON v.account = a.username
+    WHERE v.status = 'pending' AND a.is_valid = 0 AND v.is_physical = 0
+
+    UNION ALL
+
+    SELECT
+        'Sehr gut + Gut + E3',
+        COUNT(*)
+    FROM videos WHERE status IN ('sehr_gut', 'gut', 'e3') AND is_physical = 1;
+END ;;
+DELIMITER ;
+/*!50003 SET sql_mode              = @saved_sql_mode */ ;
+/*!50003 SET character_set_client  = @saved_cs_client */ ;
+/*!50003 SET character_set_results = @saved_cs_results */ ;
+/*!50003 SET collation_connection  = @saved_col_connection */ ;
+/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
+/*!50003 SET sql_mode              = 'STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION' */ ;
+/*!50003 DROP PROCEDURE IF EXISTS `get_cleanup_videos` */;
+/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
+/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
+/*!50003 SET @saved_col_connection = @@collation_connection */ ;
+/*!50003 SET character_set_client  = utf8mb4 */ ;
+/*!50003 SET character_set_results = utf8mb4 */ ;
+/*!50003 SET collation_connection  = utf8mb4_uca1400_ai_ci */ ;
+DELIMITER ;;
+CREATE PROCEDURE `get_cleanup_videos`()
+BEGIN
+    SELECT
+        v.id,
+        v.rel_path,
+        v.account,
+        v.status
+    FROM videos v
+    LEFT JOIN accounts a ON v.account = a.username
+    WHERE (v.status = 'unbrauchbar' AND v.is_physical = 1)
+       OR (v.status = 'pending' AND v.is_physical = 1 AND a.is_valid = 0)
+    ORDER BY v.account, v.status, v.id;
+END ;;
+DELIMITER ;
+/*!50003 SET sql_mode              = @saved_sql_mode */ ;
+/*!50003 SET character_set_client  = @saved_cs_client */ ;
+/*!50003 SET character_set_results = @saved_cs_results */ ;
+/*!50003 SET collation_connection  = @saved_col_connection */ ;
+/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
+/*!50003 SET sql_mode              = 'STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION' */ ;
+/*!50003 DROP PROCEDURE IF EXISTS `mark_video_deleted` */;
+/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
+/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
+/*!50003 SET @saved_col_connection = @@collation_connection */ ;
+/*!50003 SET character_set_client  = utf8mb4 */ ;
+/*!50003 SET character_set_results = utf8mb4 */ ;
+/*!50003 SET collation_connection  = utf8mb4_uca1400_ai_ci */ ;
+DELIMITER ;;
+CREATE PROCEDURE `mark_video_deleted`(IN p_video_id INT)
+BEGIN
+    UPDATE videos
+    SET is_physical = 0
+    WHERE id = p_video_id;
+END ;;
+DELIMITER ;
+/*!50003 SET sql_mode              = @saved_sql_mode */ ;
+/*!50003 SET character_set_client  = @saved_cs_client */ ;
+/*!50003 SET character_set_results = @saved_cs_results */ ;
+/*!50003 SET collation_connection  = @saved_col_connection */ ;
+/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
+/*!50003 SET sql_mode              = 'STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION' */ ;
+/*!50003 DROP PROCEDURE IF EXISTS `refresh_presort_queue` */;
+/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
+/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
+/*!50003 SET @saved_col_connection = @@collation_connection */ ;
+/*!50003 SET character_set_client  = utf8mb4 */ ;
+/*!50003 SET character_set_results = utf8mb4 */ ;
+/*!50003 SET collation_connection  = utf8mb4_uca1400_ai_ci */ ;
+DELIMITER ;;
+CREATE PROCEDURE `refresh_presort_queue`()
+BEGIN
+    TRUNCATE TABLE presort_queue;
+    UPDATE presort_state SET current_pos = 1 WHERE id = 1;
+
+    
+    INSERT INTO presort_queue (video_id)
+    SELECT v_id FROM (
+        SELECT v.id AS v_id,
+               ROW_NUMBER() OVER (
+                   PARTITION BY v.account
+                   ORDER BY v.id_zeitpunkt_ytdlp ASC
+               ) as row_num,
+               ar.rand_order
+        FROM videos v
+        JOIN (
+            SELECT username, RAND() AS rand_order
+            FROM accounts
+            WHERE is_valid = 1
+        ) ar ON v.account = ar.username
+        WHERE v.status = 'pending'
+          AND v.is_physical = 1
+    ) as rotation
+    ORDER BY row_num ASC, rand_order ASC;
+END ;;
+DELIMITER ;
+/*!50003 SET sql_mode              = @saved_sql_mode */ ;
+/*!50003 SET character_set_client  = @saved_cs_client */ ;
+/*!50003 SET character_set_results = @saved_cs_results */ ;
+/*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+--
 -- Final view structure for view `video_stats`
 --
 
@@ -269,7 +560,7 @@ DELIMITER ;
 /*!50001 SET character_set_results     = utf8mb4 */;
 /*!50001 SET collation_connection      = utf8mb4_uca1400_ai_ci */;
 /*!50001 CREATE ALGORITHM=UNDEFINED */
-/*!50013 DEFINER=`ngdb`@`%` SQL SECURITY DEFINER */
+/*!50013 SQL SECURITY DEFINER */
 /*!50001 VIEW `video_stats` AS select `a`.`username` AS `username`,`a`.`is_valid` AS `is_valid`,count(`v`.`id`) AS `total_videos`,sum(case when `v`.`status` = 'sehr_gut' then 1 else 0 end) AS `sehr_gut_count`,sum(case when `v`.`status` = 'gut' then 1 else 0 end) AS `gut_count`,sum(case when `v`.`status` = 'e3' then 1 else 0 end) AS `e3_count`,sum(case when `v`.`status` = 'pending' then 1 else 0 end) AS `pending_count`,sum(case when `v`.`status` = 'unbrauchbar' then 1 else 0 end) AS `unbrauchbar_count`,avg(`v`.`used_count`) AS `avg_usage`,max(`v`.`last_used`) AS `last_activity`,sum(`v`.`is_transformed`) AS `transformed_count` from (`accounts` `a` left join `videos` `v` on(`a`.`username` = `v`.`account`)) group by `a`.`username`,`a`.`is_valid` */;
 /*!50001 SET character_set_client      = @saved_cs_client */;
 /*!50001 SET character_set_results     = @saved_cs_results */;
@@ -284,4 +575,4 @@ DELIMITER ;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*M!100616 SET NOTE_VERBOSITY=@OLD_NOTE_VERBOSITY */;
 
--- Dump completed on 2026-02-18  4:08:28
+-- Dump completed on 2026-02-18 23:06:58
