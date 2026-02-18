@@ -1,0 +1,31 @@
+[Unit]
+Description=NaturalGrounding TikTok Ying Video Manager
+After=network-online.target
+
+[Container]
+ContainerName=NG
+Image=localhost/mariadb-media-custom:latest
+
+Environment=MARIADB_ROOT_PASSWORD=123
+Environment=MARIADB_DATABASE=NaturalGrounding-Tiktok-Ying-Video-Manager
+
+# Wayland + Audio
+Environment=WAYLAND_DISPLAY=wayland-0
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+Environment=DISPLAY=:0
+
+# Data
+Volume=mariadb_data_NG:/var/lib/mysql:Z
+Volume=%h/NaturalGrounding-Tiktok-Ying-Video-Manager/config:/app/config:Z
+Volume=%h/NaturalGrounding-Tiktok-Ying-Video-Manager/VIDEOS:/app/VIDEOS:Z
+
+# Wayland + Audio Sockets
+Volume=/run/user/1000/wayland-0:/run/user/1000/wayland-0:ro
+Volume=/run/user/1000/pipewire-0:/run/user/1000/pipewire-0:ro
+Volume=/run/user/1000/pulse:/run/user/1000/pulse:ro
+
+AddDevice=/dev/snd
+GroupAdd=video
+
+[Install]
+WantedBy=multi-user.target default.target

@@ -1,0 +1,6 @@
+db_config.env
+VIDEOS/
+*.m3u
+download_archive.txt
+clear_db.sh
+config/db_config.env

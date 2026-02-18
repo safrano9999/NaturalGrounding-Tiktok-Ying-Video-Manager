@@ -1,0 +1,27 @@
+FROM docker.io/library/mariadb:latest
+
+RUN apt-get update && apt-get install -y \
+    python3 \
+    ffmpeg \
+    mpv \
+    jq \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+
+# yt-dlp als Binary
+RUN wget -O /usr/local/bin/yt-dlp \
+    https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp \
+    && chmod +x /usr/local/bin/yt-dlp
+
+WORKDIR /app
+
+COPY *.sh /app/
+COPY schema.sql /app/
+RUN chmod +x /app/*.sh
+RUN mkdir -p /app/config /app/VIDEOS
+
+# Schema wird beim ersten Start automatisch importiert
+# (nur wenn /var/lib/mysql leer ist - also nur einmal!)
+COPY schema.sql /docker-entrypoint-initdb.d/schema.sql
+
+ENV PATH="/app:$PATH"
