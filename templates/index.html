@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NaturalGrounding</title>
+<link rel="icon" href="/static/favicon.svg">
+<style>
+:root { color-scheme: dark; --bg:#10141b; --card:#171d27; --line:#2a3443; --text:#e6edf3; --muted:#8b98a8; --ok:#45c46f; --bad:#ff6b6b; --blue:#65a9ff; --active:#1f6feb; }
+body { margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif; background:var(--bg); color:var(--text); padding:0; height: 100vh; display: flex; flex-direction: column; }
+header { background: var(--card); padding: 16px 28px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; }
+h1 { margin:0; color:var(--blue); font-size: 20px; }
+nav button { background: none; border: 1px solid var(--line); color: var(--text); padding: 6px 14px; border-radius: 6px; cursor: pointer; margin-left: 8px; }
+nav button.active { background: var(--active); border-color: var(--active); }
+main { flex: 1; overflow: auto; padding: 28px; max-width: 1200px; margin: 0 auto; width: 100%; box-sizing: border-box; }
+.sub { color:var(--muted); margin-bottom:24px; font-size: 14px; }
+.grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:14px; }
+.card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom: 14px; }
+.label { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.06em; }
+.value { font-size:24px; font-weight:700; margin-top:6px; }
+.ok { color:var(--ok); } .bad { color:var(--bad); }
+ul { padding-left:20px; } code, pre { background:#0b0f15; border:1px solid var(--line); border-radius:10px; }
+pre { padding:14px; overflow:auto; }
+a { color:var(--blue); }
+
+/* Player styles */
+#player-view { display: none; height: 100%; flex-direction: column; }
+.player-container { display: flex; gap: 20px; height: calc(100vh - 140px); }
+.video-wrapper { flex: 1; background: #000; border-radius: 14px; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+video { width: 100%; height: 100%; object-fit: contain; }
+.sidebar { width: 320px; display: flex; flex-direction: column; gap: 14px; }
+.controls { display: flex; flex-direction: column; gap: 10px; }
+select, button.btn { width: 100%; padding: 8px 12px; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); color: var(--text); }
+button.btn { background: var(--line); cursor: pointer; font-weight: bold; }
+button.btn:hover { background: var(--active); border-color: var(--active); }
+.playlist { flex: 1; overflow-y: auto; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 8px; }
+.playlist-item { padding: 8px; border-bottom: 1px solid var(--line); cursor: pointer; font-size: 14px; border-radius: 6px; margin-bottom: 4px; }
+.playlist-item:hover { background: var(--line); }
+.playlist-item.active { background: var(--active); border-color: var(--active); }
+.meta { font-size: 11px; color: var(--muted); margin-top: 4px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>NaturalGrounding</h1>
+  <nav>
+    <button id="btn-dash" class="active" onclick="switchTab('dash')">Dashboard</button>
+    <button id="btn-player" onclick="switchTab('player')">Player / Modus</button>
+  </nav>
+</header>
+
+<main id="dash-view">
+  <div class="sub">REPOS/CITADEL service module · mounted by CITADEL Gateway at <code>/naturalgrounding</code></div>
+  <section class="grid">
+    <div class="card"><div class="label">Videos</div><div class="value">{{ data.video_count }}</div><div class="sub">MP4 files in {{ data.videos_dir }}</div></div>
+    <div class="card"><div class="label">Metadata</div><div class="value">{{ data.json_count }}</div><div class="sub">yt-dlp info JSON files</div></div>
+    <div class="card"><div class="label">Config</div><div class="value {% if data.config_exists %}ok{% else %}bad{% endif %}">{% if data.config_exists %}present{% else %}env/file missing{% endif %}</div><div class="sub">{{ data.config_file }}</div></div>
+    <div class="card"><div class="label">Database</div><div class="value {% if data.db.password_set %}ok{% else %}bad{% endif %}">{{ data.db.host }}:{{ data.db.port }}</div><div class="sub">{{ data.db.name }} as {{ data.db.user }}</div></div>
+  </section>
+  <section class="card">
+    <div class="label">CLI scripts</div>
+    <ul>
+      {% for s in data.scripts %}
+        <li class="{% if s.exists %}ok{% else %}bad{% endif %}">{{ s.name }}</li>
+      {% endfor %}
+    </ul>
+  </section>
+</main>
+
+<main id="player-view" style="display: none; padding: 20px;">
+  <div class="player-container">
+    <div class="video-wrapper">
+      <video id="video-player" controls autoplay>
+        Your browser does not support HTML5 video.
+      </video>
+    </div>
+    
+    <div class="sidebar">
+      <div class="card controls" style="margin-bottom:0;">
+        <div class="label">Modus Auswahl</div>
+        <select id="filter-status">
+          <option value="sehr_gut,gut,e3">Alle positiven (Sehr gut, Gut, E3)</option>
+          <option value="sehr_gut">Nur Sehr gut 🌟</option>
+          <option value="gut">Nur Gut ✅</option>
+          <option value="e3">Nur E3 🎭</option>
+          <option value="pending">Ungesichtet (Pending)</option>
+          <option value="unbrauchbar">Unbrauchbar ❌</option>
+          <option value="all">Komplettes Archiv</option>
+        </select>
+        
+        <select id="filter-mode">
+          <option value="any">Alle Flags (Mode 1 & 2 egal)</option>
+          <option value="mode1">Nur Mode 1</option>
+          <option value="mode2">Nur Mode 2</option>
+        </select>
+        
+        <button class="btn" onclick="loadPlaylist()">Playliste laden</button>
+      </div>
+      
+      <div class="card" style="flex:1; display:flex; flex-direction:column; padding:10px; margin-bottom:0;">
+        <div class="label" style="margin-bottom:8px;">Wiedergabeliste (<span id="pl-count">0</span>)</div>
+        <div class="playlist" id="playlist-container">
+          <div style="color:var(--muted); font-size:13px; text-align:center; margin-top:20px;">Wähle einen Modus und lade die Playliste.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+function switchTab(tab) {
+  document.getElementById('dash-view').style.display = tab === 'dash' ? 'block' : 'none';
+  document.getElementById('player-view').style.display = tab === 'player' ? 'flex' : 'none';
+  document.getElementById('btn-dash').className = tab === 'dash' ? 'active' : '';
+  document.getElementById('btn-player').className = tab === 'player' ? 'active' : '';
+}
+
+let currentPlaylist = [];
+let currentIndex = -1;
+const player = document.getElementById('video-player');
+
+async function loadPlaylist() {
+  const status = document.getElementById('filter-status').value;
+  const mode = document.getElementById('filter-mode').value;
+  
+  document.getElementById('playlist-container').innerHTML = '<div style="color:var(--muted); text-align:center; margin-top:20px;">Lade...</div>';
+  
+  try {
+    const res = await fetch(`/api/videos?status=${status}&mode=${mode}`);
+    const data = await res.json();
+    currentPlaylist = data.videos || [];
+    
+    document.getElementById('pl-count').innerText = currentPlaylist.length;
+    
+    if (currentPlaylist.length === 0) {
+      document.getElementById('playlist-container').innerHTML = '<div style="color:var(--muted); text-align:center; margin-top:20px;">Keine Videos gefunden.</div>';
+      return;
+    }
+    
+    renderPlaylist();
+    playVideo(0);
+  } catch (err) {
+    document.getElementById('playlist-container').innerHTML = `<div style="color:var(--bad); padding:10px;">Fehler: ${err.message}</div>`;
+  }
+}
+
+function renderPlaylist() {
+  const container = document.getElementById('playlist-container');
+  container.innerHTML = '';
+  
+  currentPlaylist.forEach((v, idx) => {
+    const div = document.createElement('div');
+    div.className = `playlist-item ${idx === currentIndex ? 'active' : ''}`;
+    div.id = `pl-item-${idx}`;
+    div.onclick = () => playVideo(idx);
+    
+    // rel_path in DB is like "VIDEOS/account/123.mp4". We strip "VIDEOS/" to get filename
+    const filename = v.rel_path.replace('VIDEOS/', '');
+    const flags = [];
+    if (v.mode1) flags.push('M1');
+    if (v.mode2) flags.push('M2');
+    const flagStr = flags.length ? `[${flags.join(',')}]` : '';
+    
+    div.innerHTML = `
+      <div><strong>@${v.account}</strong> ${flagStr}</div>
+      <div class="meta">${v.status.toUpperCase()} | ${v.duration}s | ${v.width}x${v.height}</div>
+    `;
+    container.appendChild(div);
+  });
+}
+
+function playVideo(index) {
+  if (index < 0 || index >= currentPlaylist.length) return;
+  
+  // Remove active class from old item
+  if (currentIndex >= 0 && document.getElementById(`pl-item-${currentIndex}`)) {
+    document.getElementById(`pl-item-${currentIndex}`).classList.remove('active');
+  }
+  
+  currentIndex = index;
+  const v = currentPlaylist[index];
+  
+  // Add active class
+  const activeItem = document.getElementById(`pl-item-${currentIndex}`);
+  if (activeItem) {
+    activeItem.classList.add('active');
+    activeItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+  
+  // Determine URL. FastAPI static mount is at /videos, and maps directly to VIDEOS_DIR.
+  // DB rel_path starts with "VIDEOS/". So we replace "VIDEOS/" with "/videos/".
+  let urlPath = v.rel_path;
+  if (urlPath.startsWith('VIDEOS/')) {
+    urlPath = '/videos/' + urlPath.substring(7);
+  } else {
+    urlPath = '/' + urlPath; // fallback
+  }
+  
+  player.src = urlPath;
+  player.play().catch(e => console.error("Autoplay prevented:", e));
+}
+
+// Auto-play next video when current ends
+player.addEventListener('ended', () => {
+  if (currentIndex < currentPlaylist.length - 1) {
+    playVideo(currentIndex + 1);
+  }
+});
+</script>
+</body>
+</html>
