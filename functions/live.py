@@ -1,7 +1,10 @@
+import os
 import random
+from pathlib import Path
 import yt_dlp
 from . import db
-from . import manager
+
+VIDEOS_DIR = Path(os.environ.get("VIDEOS_DIR", Path(__file__).resolve().parent.parent / "VIDEOS"))
 
 def fetch_live_batch(limit=3):
     accounts = db.query("SELECT username FROM accounts WHERE is_valid = 1")
@@ -29,7 +32,6 @@ def fetch_live_batch(limit=3):
                     if not e: continue
                     v_id = e.get('id')
                     
-                    # Only return if not already in the DB
                     existing = db.query_scalar("SELECT COUNT(*) FROM videos WHERE video_id = %s", (v_id,))
                     if existing == 0:
                         stream_url = e.get('url')
@@ -60,9 +62,63 @@ def fetch_live_batch(limit=3):
             
     return {"videos": batch}
 
+def sync_video(info_dict, filepath):
+    v_id = info_dict.get('id')
+    v_user = info_dict.get('uploader') or info_dict.get('uploader_id')
+    if not v_id or not v_user:
+        return
+        
+    v_dur = info_dict.get('duration') or 0
+    v_width = info_dict.get('width') or 0
+    v_height = info_dict.get('height') or 0
+    v_views = info_dict.get('view_count') or 0
+    v_desc = info_dict.get('description') or ""
+    
+    raw_date = info_dict.get('upload_date')
+    v_date = None
+    if raw_date and len(raw_date) == 8:
+        v_date = f"{raw_date[:4]}-{raw_date[4:6]}-{raw_date[6:]}"
+        
+    try:
+        rel_path = str(Path(filepath).relative_to(VIDEOS_DIR.parent))
+    except ValueError:
+        rel_path = str(filepath)
+        
+    acc = db.query_scalar("SELECT COUNT(*) FROM accounts WHERE username = %s", (v_user,))
+    if not acc:
+        db.execute("INSERT INTO accounts (username, is_valid) VALUES (%s, 1)", (v_user,))
+        print(f"Added account: @{v_user}")
+        
+    sql = """
+        INSERT INTO videos (
+            video_id, duration, width, height, view_count,
+            upload_date, description, rel_path, account,
+            init_ytdlp, id_zeitpunkt_ytdlp, status, is_physical
+        ) VALUES (
+            %s, %s, %s, %s, %s,
+            %s, %s, %s, %s,
+            1, NOW(), 'pending', 1
+        ) ON DUPLICATE KEY UPDATE
+            view_count = VALUES(view_count),
+            id_zeitpunkt_ytdlp = NOW(),
+            is_physical = 1,
+            description = VALUES(description)
+    """
+    db.execute(sql, (
+        v_id, v_dur, v_width, v_height, v_views,
+        v_date, v_desc, rel_path, v_user
+    ))
+    print(f"Synced background video: {v_id} @{v_user}")
+
+class SyncPostProcessor(yt_dlp.postprocessor.PostProcessor):
+    def run(self, info):
+        filepath = info.get('filepath') or info.get('__files_to_move', {}).get(info.get('requested_downloads', [{}])[0].get('filepath')) or info.get('filename')
+        sync_video(info, filepath)
+        return [], info
+
 def download_rated_video(video_id, account, tiktok_url, rating):
     ydl_opts = {
-        'outtmpl': str(manager.VIDEOS_DIR / '%(uploader)s' / '%(id)s.%(ext)s'),
+        'outtmpl': str(VIDEOS_DIR / '%(uploader)s' / '%(id)s.%(ext)s'),
         'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/mp4',
         'writeinfojson': True,
         'no_post_overwrites': True,
@@ -70,9 +126,8 @@ def download_rated_video(video_id, account, tiktok_url, rating):
     }
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.add_post_processor(manager.SyncPostProcessor())
+            ydl.add_post_processor(SyncPostProcessor())
             ydl.download([tiktok_url])
-        # override 'pending' status set by SyncPostProcessor to the actual user rating
         db.execute("UPDATE videos SET status = %s WHERE video_id = %s", (rating, video_id))
         print(f"Background download finished for {video_id} -> {rating}")
     except Exception as e:
