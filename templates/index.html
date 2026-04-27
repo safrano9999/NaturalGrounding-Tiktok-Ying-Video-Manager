@@ -10,7 +10,7 @@
 body { margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif; background:var(--bg); color:var(--text); padding:0; height: 100vh; display: flex; flex-direction: column; }
 header { background: var(--card); padding: 16px 28px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; }
 h1 { margin:0; color:var(--blue); font-size: 20px; }
-nav button { background: none; border: 1px solid var(--line); color: var(--text); padding: 6px 14px; border-radius: 6px; cursor: pointer; margin-left: 8px; }
+nav button { background: none; border: 1px solid var(--line); color: var(--text); padding: 6px 14px; border-radius: 6px; cursor: pointer; margin-left: 8px; font-weight: bold; }
 nav button.active { background: var(--active); border-color: var(--active); }
 main { flex: 1; overflow: auto; padding: 28px; max-width: 1200px; margin: 0 auto; width: 100%; box-sizing: border-box; }
 .sub { color:var(--muted); margin-bottom:24px; font-size: 14px; }
@@ -31,6 +31,7 @@ video { width: 100%; height: 100%; object-fit: contain; }
 .sidebar { width: 340px; display: flex; flex-direction: column; gap: 14px; }
 .controls { display: flex; flex-direction: column; gap: 10px; }
 select, button.btn { width: 100%; padding: 8px 12px; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); color: var(--text); box-sizing: border-box; }
+input[type="text"], input[type="password"], input[type="number"] { width: 100%; padding: 8px 12px; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); color: var(--text); box-sizing: border-box; margin-bottom: 10px; }
 button.btn { background: var(--line); cursor: pointer; font-weight: bold; }
 button.btn:hover { background: var(--active); border-color: var(--active); }
 .playlist { flex: 1; overflow-y: auto; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 8px; }
@@ -43,6 +44,12 @@ button.btn:hover { background: var(--active); border-color: var(--active); }
 /* Rate Buttons */
 .rate-btn { flex: 1 1 45%; border: none; padding: 8px 0; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; color: #000; }
 .rate-btn:hover { filter: brightness(1.1); }
+
+/* Setup view */
+#setup-view { display: none; }
+.form-group { margin-bottom: 14px; }
+.form-group label { display: block; margin-bottom: 6px; font-weight: bold; font-size: 14px; color: var(--text); }
+.form-error { color: var(--bad); font-size: 12px; margin-top: 4px; display: none; }
 </style>
 </head>
 <body>
@@ -51,6 +58,7 @@ button.btn:hover { background: var(--active); border-color: var(--active); }
   <nav>
     <button id="btn-dash" class="active" onclick="switchTab('dash')">Dashboard</button>
     <button id="btn-player" onclick="switchTab('player')">Player / Modus</button>
+    <button id="btn-setup" onclick="switchTab('setup')">Setup</button>
   </nav>
 </header>
 
@@ -70,6 +78,22 @@ button.btn:hover { background: var(--active); border-color: var(--active); }
       {% endfor %}
     </ul>
   </section>
+</main>
+
+<main id="setup-view">
+  <div class="card" style="max-width: 600px; margin: 0 auto;">
+    <h2 style="margin-top:0; color:var(--blue);">Datenbank & Verzeichnisse (powered by prettyconfig)</h2>
+    <div class="sub">Konfiguriere die Anbindung an deine MariaDB und das Video-Verzeichnis.</div>
+    
+    <div id="setup-loading" style="color:var(--muted);">Lade Setup Schema...</div>
+    <div id="setup-error" style="color:var(--bad); display:none;"></div>
+    
+    <form id="setup-form" style="display:none;" onsubmit="saveSetup(event)">
+      <div id="setup-fields"></div>
+      <button type="submit" class="btn" style="background:var(--ok); color:#000; margin-top:20px;">Speichern & Neustarten</button>
+      <div id="setup-save-msg" style="margin-top: 10px; font-weight:bold;"></div>
+    </form>
+  </div>
 </main>
 
 <main id="player-view">
@@ -135,10 +159,166 @@ button.btn:hover { background: var(--active); border-color: var(--active); }
 function switchTab(tab) {
   document.getElementById('dash-view').style.display = tab === 'dash' ? 'block' : 'none';
   document.getElementById('player-view').style.display = tab === 'player' ? 'flex' : 'none';
+  document.getElementById('setup-view').style.display = tab === 'setup' ? 'block' : 'none';
   document.getElementById('btn-dash').className = tab === 'dash' ? 'active' : '';
   document.getElementById('btn-player').className = tab === 'player' ? 'active' : '';
+  document.getElementById('btn-setup').className = tab === 'setup' ? 'active' : '';
+  
+  if (tab === 'setup') {
+    loadSetupSchema();
+  }
 }
 
+// Check if config exists, if not, jump to setup
+{% if not data.config_exists or not data.db.password_set %}
+  switchTab('setup');
+{% endif %}
+
+// --- SETUP LOGIC (PRETTYCONFIG) ---
+async function loadSetupSchema() {
+  const loading = document.getElementById('setup-loading');
+  const errorDiv = document.getElementById('setup-error');
+  const form = document.getElementById('setup-form');
+  const fieldsContainer = document.getElementById('setup-fields');
+  
+  loading.style.display = 'block';
+  errorDiv.style.display = 'none';
+  form.style.display = 'none';
+  
+  try {
+    const res = await fetch('/api/setup/schema');
+    const data = await res.json();
+    
+    loading.style.display = 'none';
+    
+    if (data.error) {
+      errorDiv.innerText = data.error;
+      errorDiv.style.display = 'block';
+      return;
+    }
+    
+    fieldsContainer.innerHTML = '';
+    
+    data.fields.forEach(field => {
+      const group = document.createElement('div');
+      group.className = 'form-group';
+      group.id = `group-${field.key}`;
+      
+      const label = document.createElement('label');
+      label.innerText = field.label + (field.required ? ' *' : '');
+      group.appendChild(label);
+      
+      const val = field.current_value !== undefined ? field.current_value : field.default;
+      
+      if (field.type === 'bool') {
+        const select = document.createElement('select');
+        select.id = `input-${field.key}`;
+        select.name = field.key;
+        select.innerHTML = `<option value="true">Ja</option><option value="false">Nein</option>`;
+        select.value = val === true || val === 'true' || val === '1' ? 'true' : 'false';
+        group.appendChild(select);
+      } else if (field.type === 'choice') {
+        const select = document.createElement('select');
+        select.id = `input-${field.key}`;
+        select.name = field.key;
+        field.choices.forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = c;
+          opt.innerText = c;
+          select.appendChild(opt);
+        });
+        select.value = val;
+        group.appendChild(select);
+      } else {
+        const input = document.createElement('input');
+        input.id = `input-${field.key}`;
+        input.name = field.key;
+        input.type = field.key.includes('PW') || field.key.includes('PASSWORD') ? 'password' : 'text';
+        input.value = val;
+        if (field.required) input.required = true;
+        group.appendChild(input);
+      }
+      
+      if (field.help) {
+        const help = document.createElement('div');
+        help.style.fontSize = '12px';
+        help.style.color = 'var(--muted)';
+        help.style.marginTop = '4px';
+        help.innerText = field.help;
+        group.appendChild(help);
+      }
+      
+      const err = document.createElement('div');
+      err.className = 'form-error';
+      err.id = `error-${field.key}`;
+      group.appendChild(err);
+      
+      fieldsContainer.appendChild(group);
+    });
+    
+    form.style.display = 'block';
+    
+  } catch (err) {
+    loading.style.display = 'none';
+    errorDiv.innerText = err.message;
+    errorDiv.style.display = 'block';
+  }
+}
+
+async function saveSetup(e) {
+  e.preventDefault();
+  
+  const form = document.getElementById('setup-form');
+  const msg = document.getElementById('setup-save-msg');
+  msg.innerText = 'Speichere...';
+  msg.style.color = 'var(--text)';
+  
+  // Clear old errors
+  document.querySelectorAll('.form-error').forEach(el => el.style.display = 'none');
+  
+  const formData = new FormData(form);
+  const data = {};
+  for (let [key, value] of formData.entries()) {
+    data[key] = value;
+  }
+  
+  try {
+    const res = await fetch('/api/setup/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    
+    const result = await res.json();
+    
+    if (res.status === 400 && result.errors) {
+      msg.innerText = 'Bitte Eingaben überprüfen.';
+      msg.style.color = 'var(--bad)';
+      
+      result.errors.forEach(err => {
+        // Errors are usually strings. Try to match to fields (rudimentary)
+        // In a real app, prettyconfig would return structured errors
+        const errDiv = document.createElement('div');
+        errDiv.style.color = 'var(--bad)';
+        errDiv.style.fontSize = '12px';
+        errDiv.innerText = err;
+        msg.appendChild(errDiv);
+      });
+    } else if (res.status === 200) {
+      msg.innerText = 'Gespeichert! Bitte Container neustarten (oder Seite neu laden).';
+      msg.style.color = 'var(--ok)';
+      setTimeout(() => location.reload(), 2000);
+    } else {
+      throw new Error(result.error || 'Unbekannter Fehler');
+    }
+  } catch (err) {
+    msg.innerText = err.message;
+    msg.style.color = 'var(--bad)';
+  }
+}
+
+
+// --- REST OF PLAYER LOGIC ---
 let playMode = 'archive';
 let currentPlaylist = [];
 let currentIndex = -1;
@@ -156,7 +336,6 @@ function togglePlayMode() {
   document.getElementById('live-actions').style.display = 'none';
   player.src = '';
   
-  // Natural Grounding live videos loop until rated. Local archive auto-advances.
   player.loop = (playMode === 'live');
 }
 
@@ -235,7 +414,6 @@ function playVideo(index) {
     player.src = urlPath;
     document.getElementById('live-actions').style.display = 'none';
   } else {
-    // Live mode
     player.src = v.stream_url;
     document.getElementById('live-actions').style.display = 'flex';
   }
@@ -254,7 +432,6 @@ async function fetchLiveQueue() {
     
     if (data.error) throw new Error(data.error);
     
-    // Add to current playlist, or replace if we want fresh
     currentPlaylist = data.videos || [];
     document.getElementById('pl-count').innerText = currentPlaylist.length;
     
@@ -278,7 +455,6 @@ function renderLivePlaylist() {
     const div = document.createElement('div');
     div.className = `playlist-item ${idx === currentIndex ? 'active' : ''}`;
     div.id = `pl-item-${idx}`;
-    // No direct click to jump in live mode to force rating
     
     const desc = v.description.length > 30 ? v.description.substring(0, 30) + '...' : v.description;
     
@@ -311,16 +487,13 @@ async function rateLive(rating) {
     console.error("Rating failed", e);
   }
   
-  // Advance to next live video
   if (currentIndex < currentPlaylist.length - 1) {
     playVideo(currentIndex + 1);
   } else {
-    // Queue empty, fetch more automatically
     fetchLiveQueue();
   }
 }
 
-// Auto-play next video when current ends (ARCHIVE ONLY)
 player.addEventListener('ended', () => {
   if (playMode === 'archive' && currentIndex < currentPlaylist.length - 1) {
     playVideo(currentIndex + 1);
