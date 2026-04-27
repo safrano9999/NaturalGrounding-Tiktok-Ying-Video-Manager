@@ -32,8 +32,10 @@ import api
 
 from pydantic import BaseModel
 from fastapi import BackgroundTasks
+
 import live
 import db
+import setup
 
 app = FastAPI(title="NaturalGrounding")
 
@@ -96,6 +98,17 @@ def api_live_rate(req: RateRequest, background_tasks: BackgroundTasks):
         )
         return {"status": "ignored"}
     return {"status": "skipped"}
+
+
+@app.get("/api/setup/schema")
+def api_setup_schema():
+    return JSONResponse(setup.get_schema_data())
+
+@app.post("/api/setup/save")
+async def api_setup_save(request: Request):
+    data = await request.json()
+    res, status = setup.save_config(data)
+    return JSONResponse(res, status_code=status)
 
 @app.get("/api/health")
 def api_health():
