@@ -1,0 +1,38 @@
+schema_version = 1
+schema_name = "naturalgrounding"
+
+[[fields]]
+key = "DB_HOST"
+type = "str"
+default = "127.0.0.1"
+label = "Database Host"
+
+[[fields]]
+key = "DB_PORT"
+type = "port"
+default = 3306
+label = "Database Port"
+
+[[fields]]
+key = "DB_NAME"
+type = "str"
+default = "NaturalGrounding-Tiktok-Ying-Video-Manager"
+label = "Database Name"
+
+[[fields]]
+key = "DB_USER"
+type = "str"
+default = "NaturalGrounding-Tiktok-Ying-Video-Manager"
+label = "Database User"
+
+[[fields]]
+key = "DB_PW"
+type = "str"
+label = "Database Password"
+required = true
+
+[[fields]]
+key = "VIDEOS_DIR"
+type = "str"
+default = "VIDEOS"
+label = "Path to Video Directory"

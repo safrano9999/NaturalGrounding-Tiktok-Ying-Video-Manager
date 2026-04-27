@@ -23,23 +23,27 @@ mkdir -p config VIDEOS tmp
 if [[ ! -f "config/db_config.env" ]]; then
     echo -e "${YELLOW}No config found. Creating from template...${NC}"
 
-    if [[ -f "config/db_config.env.example" ]]; then
-        cp config/db_config.env.example config/db_config.env
+    if command -v python3 &>/dev/null && python3 -c "import prettyconfig" 2>/dev/null; then
+        echo -e "${GREEN}Starting interactive setup (powered by prettyconfig)...${NC}"
+        python3 configure.py
     else
-        # Create default config
-        cat > config/db_config.env << 'DBCONF'
-DB_HOST=localhost
+        echo -e "${YELLOW}prettyconfig not found. Creating default template...${NC}"
+        if [[ -f "config/db_config.env.example" ]]; then
+            cp config/db_config.env.example config/db_config.env
+        else
+            cat > config/db_config.env << 'DBCONF'
+DB_HOST=127.0.0.1
+DB_PORT=3306
 DB_NAME=NaturalGrounding-Tiktok-Ying-Video-Manager
-DB_USER=nguser
-DB_PW=ngpass
+DB_USER=NaturalGrounding-Tiktok-Ying-Video-Manager
+DB_PW=change-me
+VIDEOS_DIR=VIDEOS
 DBCONF
+        fi
+        echo -e "${GREEN}✓${NC} Created config/db_config.env template."
+        echo "Please edit it, then run ./INIT.sh again."
+        exit 0
     fi
-
-    echo -e "${GREEN}✓${NC} Created config/db_config.env"
-    echo ""
-    echo "Edit config/db_config.env with your credentials, then run:"
-    echo "  ./init.sh"
-    exit 0
 fi
 
 # Load config
