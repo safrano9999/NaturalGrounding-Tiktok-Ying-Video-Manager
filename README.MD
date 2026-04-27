@@ -1,40 +1,61 @@
 ![NG](NG_2026.png)
 
-
-
 # 🎥 Natural Grounding TikTok Video Manager
 
+A dual-architecture tool (FastAPI Web + Bash CLI) designed to download, curate, and stream TikTok videos to build a personal "Natural Grounding" library.
 
+---
 
-## 🌿 Background
+## 🌿 Background & Theory
 
 Natural Grounding is a practice by Rion Williams (2007) - the idea is simple: immersive, repeated viewing of women with authentic, uninhibited feminine energy recalibrates your attraction baseline away from the manufactured Western standard.
 
 ### 🧘 How it works
+You sit down, put on a playlist of curated videos, and just watch - relaxed, no agenda. No analysis, no overthinking. You let the energy of naturally feminine women sink in. Over time this builds a real internal reference point for what genuine femininity looks and feels like.
 
-You sit down, put on a playlist of curated videos, and just watch - relaxed, no agenda. No analysis, no overthinking. You let the energy of naturally feminine women sink in. Over time this builds a real internal reference point for what genuine femininity looks and feels like, which most Western men have never had. The result is that you feel better, more grounded, less reactive to social games - and women notice.
-
-Williams originally used Thai pop VCDs for this. **TikTok is the modern equivalent** - millions of short clips, many from East and Southeast Asian creators, where that same unfiltered natural energy still surfaces constantly. The challenge is finding and curating it efficiently. That's what this tool does.
-
-### 📊 Content Categories
-
-Williams rated his resources with a simple system: `N` for natural energy, `SB` for Silver Bullet (highest impact), and `E` for Entertainment - enjoyable but mixed energy, not pure grounding material.
-
-This project maps that to TikTok. The **E3** classification directly corresponds to Williams' E3 the vault high energy state numen enlightment resonanz trigger.
+**TikTok is the modern equivalent** of Williams' original Thai pop VCDs - millions of short clips, where that unfiltered natural energy still surfaces constantly. The challenge is finding and curating it efficiently. That's what this tool does.
 
 ---
 
-## ⚙️ What It Does
+## 🏗️ Architecture & Dual Interface
 
-- 📥 **Download** TikTok videos from curated accounts via `yt-dlp`
-- 🎬 **Classify** each video interactively with `mpv`
-- 📋 **Build playlists** with configurable filters
-- 🗄️ **Track metadata** per video (views, date, resolution, usage count)
-- 👤 **Manage accounts** (activate, blacklist, bulk import)
+This repository supports two completely isolated, yet compatible interfaces sharing the same MariaDB instance and `VIDEOS/` folder:
+
+1. **The Classic CLI (Bash + `mpv`)**: Blazing fast, hotkey-driven video sorting using local native tools.
+2. **The FastAPI WebUI (CITADEL-ready)**: A modern browser-based dashboard with dynamic streaming, live discovery, and a schema-driven configuration wizard.
 
 ---
 
-## 🏷️ Video Classification
+## ⚙️ Technical Overview & Functions
+
+### 🌐 1. Python / FastAPI Web Backend (`webui.py` & `functions/`)
+
+The new WebUI acts as a drop-in service module for the `CITADEL` Gateway, running on port `850`. 
+
+* **`webui.py` (Core Router)**: 
+  Mounts the FastAPI app, the Jinja2 HTML templates, and crucially, serves the local MP4 storage (`VIDEOS/`) via `StaticFiles`. This enables native **HTTP Range Requests**, allowing seamless scrubbing and memory-efficient streaming of videos directly to the browser.
+* **`functions/live.py` (Live Discovery Mode)**: 
+  Instead of blindly downloading videos, this module uses `yt-dlp` to dynamically scrape active TikTok accounts *in-memory*. It extracts the raw CDN `.mp4` URLs and streams them instantly to the WebUI. If the user rates a video positively, it triggers a `BackgroundTasks` runner to physically download and ingest the video into the database without blocking the UI.
+* **`functions/api.py`**: 
+  Assembles playlists on the fly based on the user's active filters (e.g., specific tags, rating status). Returns a shuffled JSON queue to the frontend player.
+* **`functions/core.py`**: 
+  Provides telemetry, file counts, database connection checks, and health-status endpoints for the CITADEL dashboard.
+* **`functions/setup.py` & `configure.py` (`prettyconfig`)**: 
+  Powered by the `prettyconfig` library. Defines the configuration schema once (`config/setup.toml`) and uses it to render both an interactive CLI setup wizard (`configure.py`) and an automatic Web Setup form if credentials are missing upon first boot.
+
+### 🖥️ 2. The Classic Bash CLI (`NATURAL_*.sh`)
+
+For users who prefer the terminal, the original shell scripts remain fully intact. They have been wrapped with `lib/runtime_env.sh` to seamlessly inherit database credentials provided by the CITADEL container environment, falling back to local `.env` configurations.
+
+* `./NATURAL_MANAGER.sh` — Batch downloads new videos via `yt-dlp`.
+* `./NATURAL_PRESORT.sh` — Feeds downloaded videos into `mpv` for high-speed hotkey rating.
+* `./NATURAL_PLAYLIST.sh` — Interactive CLI builder to query the MariaDB and queue playlists.
+* `./NATURAL_NEWACCOUNTS.sh` — Whitelist/Blacklist TikTok account sources.
+* `./NATURAL_CLEANUP.sh` & `./clear_db.sh` — Trigger MariaDB stored procedures to prune unwanted files and optimize storage.
+
+---
+
+## 🏷️ Video Classification (MariaDB)
 
 | Status | Meaning |
 |--------|---------|
@@ -42,103 +63,20 @@ This project maps that to TikTok. The **E3** classification directly corresponds
 | `sehr_gut` | 🌟 Strong natural energy - primary grounding material |
 | `gut` | ✅ Good natural energy |
 | `e3` | 🎭 Entertainment tier - enjoyable, mixed energy |
-| `unbrauchbar` | ❌ Rejected |
+| `unbrauchbar` | ❌ Rejected (Physically deleted during Cleanup, but ID kept in DB to prevent re-download) |
 
 ---
 
-## 🚀 Setup
+## 🏰 Deployment: REPOS / CITADEL Integration
 
-### Bare Metal
-```bash
-cp config/db_config.env.example config/db_config.env
-nano config/db_config.env
-./init.sh
-```
+This project natively plugs into the `REPOS` architecture.
 
-### 🐳 Podman + Quadlet (systemd)
-```bash
-# Build image
-podman build -f DOCKERFILE -t localhost/mariadb-media-custom:latest .
+**Repository-local integration files:**
+* `CONTAINER/module.toml` — Meta-definitions, exposed ports (`850`), env var prompts, and volume persistence maps.
+* `CONTAINER/runtime.toml` — `supervisord` instructions specifying `python3 webui.py` as the autostart target.
+* `CONTAINER/env_example` — Env template for standalone runs.
 
-# Install (auto-detects UID, Wayland, XDG paths)
-./install.sh
+When selected through the `REPOS` builder, `CITADEL` automatically detects the sibling module, adds the `webui.py` FastAPI app to its router, and mounts the manager at:
+`http://<gateway-ip>:800/naturalgrounding`
 
-# Start
-systemctl --user start NG
-```
-
----
-
-## 🎮 Usage
-
-```bash
-./NATURAL_MANAGER.sh      # 📥 Download new videos
-./NATURAL_PRESORT.sh      # 🎬 Classify with mpv
-./NATURAL_PLAYLIST.sh     # 📋 Build & export playlists
-./NATURAL_NEWACCOUNTS.sh  # 👤 Manage accounts [--blacklist]
-```
-
----
-
-## 📁 Structure
-
-```
-.
-├── config/
-│   ├── db_config.env          # 🔒 credentials (git-ignored)
-│   └── db_config.env.example
-├── VIDEOS/                    # downloaded videos
-├── NATURAL_MANAGER.sh
-├── NATURAL_PRESORT.sh
-├── NATURAL_PLAYLIST.sh
-├── NATURAL_NEWACCOUNTS.sh
-├── sync.sh                    # yt-dlp → DB (called internally)
-├── init.sh                    # database setup
-├── install.sh                 # quadlet installer
-├── schema.sql
-└── DOCKERFILE                 # all-in-one (MariaDB + tools)
-```
-
----
-
-## 🐳 Container Volumes
-
-| Mount | Purpose |
-|-------|---------|
-| `mariadb_data_NG:/var/lib/mysql` | 🗄️ Database |
-| `~/NaturalGrounding-.../config` | ⚙️ Config + skip lists |
-| `~/NaturalGrounding-.../VIDEOS` | 🎥 Video files |
-| `/run/user/1000/wayland-0` | 🖥️ Wayland display |
-| `/run/user/1000/pipewire-0` | 🔊 Audio |
-
-> Schema and default state rows imported automatically on first container start.
-
----
-
-## 📖 Reference
-
-Rion Williams - *Natural Grounding Package Guide*, Dreamcore Productions, 2007
-
----
-
-## 🏰 REPOS / CITADEL Integration
-
-This repository can be consumed as a REPOS module and mounted by the CITADEL gateway.
-
-Repository-local integration files:
-
-- `CONTAINER/module.toml` — module metadata, ports, env prompts, persistence
-- `CONTAINER/runtime.toml` — supervisor runtime for the FastAPI WebUI
-- `CONTAINER/env_example` — env template for REPOS/container runs
-- `webui.py` + `functions/core.py` — small CITADEL-discoverable service dashboard
-- `lib/runtime_env.sh` — loads DB settings from REPOS env first, legacy `config/db_config.env` second
-
-Runtime defaults:
-
-- WebUI: `NATURALGROUNDING_PORT=850`
-- Persistent paths:
-  - `/opt/NaturalGrounding-Tiktok-Ying-Video-Manager/config`
-  - `/opt/NaturalGrounding-Tiktok-Ying-Video-Manager/VIDEOS`
-
-When selected through REPOS, CITADEL discovers the cloned sibling repo via
-`CONTAINER/module.toml` + `webui.py` and mounts it at `/naturalgrounding`.
+*(Stand-alone runs are possible via `python3 configure.py` followed by `uvicorn webui:app`)*.
