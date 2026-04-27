@@ -1,0 +1,16 @@
+schema_version = 1
+
+[runtime]
+persistent_paths = [
+  "/opt/NaturalGrounding-Tiktok-Ying-Video-Manager/config",
+  "/opt/NaturalGrounding-Tiktok-Ying-Video-Manager/VIDEOS",
+]
+
+[[runtime.programs]]
+name = "naturalgrounding"
+command = "python3 webui.py"
+directory = "/opt/NaturalGrounding-Tiktok-Ying-Video-Manager"
+autostart = true
+autorestart = true
+startsecs = 3
+priority = 220

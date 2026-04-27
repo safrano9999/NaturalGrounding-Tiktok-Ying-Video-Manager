@@ -4,9 +4,10 @@
 # =============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/config/db_config.env"
+# shellcheck source=lib/runtime_env.sh
+source "$SCRIPT_DIR/lib/runtime_env.sh"
 
-BASE_DL_DIR="$SCRIPT_DIR/VIDEOS"
+BASE_DL_DIR="$VIDEOS_DIR"
 TEMP_ARCHIVE="$SCRIPT_DIR/config/skip_list.txt"
 
 mkdir -p "$BASE_DL_DIR"
@@ -26,9 +27,9 @@ echo ""
 echo "Starting download run..."
 echo ""
 
-VIDEOS_BEFORE=$(mariadb -h "$DB_HOST" -u "$DB_USER" -p"$DB_PW" "$DB_NAME" -N -s -e "SELECT COUNT(*) FROM videos;")
+VIDEOS_BEFORE=$(mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PW" "$DB_NAME" -N -s -e "SELECT COUNT(*) FROM videos;")
 
-ACCOUNTS_DATA=$(mariadb -h "$DB_HOST" -u "$DB_USER" -p"$DB_PW" "$DB_NAME" -N -s -e "
+ACCOUNTS_DATA=$(mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PW" "$DB_NAME" -N -s -e "
     SELECT a.username, COUNT(v.video_id) as v_count
     FROM accounts a
     LEFT JOIN videos v ON a.username = v.account
@@ -46,7 +47,7 @@ while read -r USER V_COUNT; do
         continue
     fi
 
-    mariadb -h "$DB_HOST" -u "$DB_USER" -p"$DB_PW" "$DB_NAME" -N -s -e "
+    mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PW" "$DB_NAME" -N -s -e "
         SELECT CONCAT('tiktok ', video_id)
         FROM videos
         WHERE account = '$USER'
@@ -76,10 +77,10 @@ echo "======================================================="
 echo "Download run completed!"
 echo "======================================================="
 
-VIDEOS_AFTER=$(mariadb -h "$DB_HOST" -u "$DB_USER" -p"$DB_PW" "$DB_NAME" -N -s -e "SELECT COUNT(*) FROM videos;")
+VIDEOS_AFTER=$(mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PW" "$DB_NAME" -N -s -e "SELECT COUNT(*) FROM videos;")
 NEW_THIS_RUN=$((VIDEOS_AFTER - VIDEOS_BEFORE))
 
-mariadb -h "$DB_HOST" -u "$DB_USER" -p"$DB_PW" "$DB_NAME" -e "
+mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PW" "$DB_NAME" -e "
     SELECT
         COUNT(*) as total_videos,
         $NEW_THIS_RUN as new_this_run,

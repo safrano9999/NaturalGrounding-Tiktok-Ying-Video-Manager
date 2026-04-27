@@ -8,14 +8,8 @@ set -euo pipefail
 # SCRIPT_DIR works here because yt-dlp calls sync.sh with absolute path
 # (from --exec "after_move:$SCRIPT_DIR/sync.sh ...") so BASH_SOURCE[0] is absolute
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_FILE="$SCRIPT_DIR/config/db_config.env"
-
-if [[ ! -f "$CONFIG_FILE" ]]; then
-    echo "ERROR: Config not found: $CONFIG_FILE" >&2
-    exit 1
-fi
-
-source "$CONFIG_FILE"
+# shellcheck source=lib/runtime_env.sh
+source "$SCRIPT_DIR/lib/runtime_env.sh"
 
 JSON_FILE="${1:-}"
 if [[ -z "$JSON_FILE" ]] || [[ ! -f "$JSON_FILE" ]]; then
@@ -24,7 +18,7 @@ if [[ -z "$JSON_FILE" ]] || [[ ! -f "$JSON_FILE" ]]; then
 fi
 
 do_sql() {
-    mariadb -h "$DB_HOST" -u "$DB_USER" -p"$DB_PW" "$DB_NAME" -N -s -e "$1" 2>&1
+    mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PW" "$DB_NAME" -N -s -e "$1" 2>&1
 }
 sql_escape() { echo "${1//\'/\'\'}"; }
 

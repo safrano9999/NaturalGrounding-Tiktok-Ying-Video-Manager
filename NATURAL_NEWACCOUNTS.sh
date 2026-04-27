@@ -1,17 +1,8 @@
 #!/bin/bash
 
-# Pfad zur Config
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_FILE="$SCRIPT_DIR/config/db_config.env"
-
-# Prüfen ob Config existiert
-if [ ! -f "$CONFIG_FILE" ]; then
-    echo "FEHLER: $CONFIG_FILE nicht gefunden!"
-    exit 1
-fi
-
-# Sourcen der Variablen (DB_HOST, DB_NAME, DB_USER, DB_PW)
-source "$CONFIG_FILE"
+# shellcheck source=lib/runtime_env.sh
+source "$SCRIPT_DIR/lib/runtime_env.sh"
 
 # Modus-Check
 VALID_VALUE=1
@@ -23,7 +14,7 @@ process_account() {
 
     # 1. Prüfen, ob der Account schon existiert und was sein aktueller Status ist
     # Wir holen uns direkt den aktuellen is_valid Wert
-    local current_status=$(mariadb -h "$DB_HOST" -u "$DB_USER" -p"$DB_PW" "$DB_NAME" -N -s -e "SELECT is_valid FROM accounts WHERE username = '$acc';")
+    local current_status=$(mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PW" "$DB_NAME" -N -s -e "SELECT is_valid FROM accounts WHERE username = '$acc';")
 
     if [ -n "$current_status" ]; then
         # Account existiert bereits
@@ -32,13 +23,13 @@ process_account() {
         else
             # Status hat sich geändert -> UPDATE (ID bleibt gleich!)
             local query="UPDATE accounts SET is_valid = $VALID_VALUE WHERE username = '$acc';"
-            mariadb -h "$DB_HOST" -u "$DB_USER" -p"$DB_PW" "$DB_NAME" -e "$query"
+            mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PW" "$DB_NAME" -e "$query"
             echo "--> [UPDATE] $acc von $current_status auf $VALID_VALUE gesetzt"
         fi
     else
         # Account existiert noch nicht -> INSERT (ID geht hoch!)
         local query="INSERT INTO accounts (username, is_valid) VALUES ('$acc', $VALID_VALUE);"
-        mariadb -h "$DB_HOST" -u "$DB_USER" -p"$DB_PW" "$DB_NAME" -e "$query"
+        mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PW" "$DB_NAME" -e "$query"
         echo "--> [NEU] $acc angelegt als $MODUS_TEXT"
     fi
 }

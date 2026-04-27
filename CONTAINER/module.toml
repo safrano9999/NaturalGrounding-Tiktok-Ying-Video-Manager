@@ -1,0 +1,73 @@
+schema_version = 1
+
+[module]
+name = "naturalgrounding"
+catalog = "public.list"
+kind = "repo"
+source = "https://github.com/safrano9999/NaturalGrounding-Tiktok-Ying-Video-Manager.git"
+target_dir = "NaturalGrounding-Tiktok-Ying-Video-Manager"
+env_ref = "CONTAINER/env_example"
+runtime_ref = "CONTAINER/runtime.toml"
+description = "NaturalGrounding TikTok video manager"
+default_selected = true
+
+[[persistence]]
+path = "/opt/NaturalGrounding-Tiktok-Ying-Video-Manager/config"
+
+[[persistence]]
+path = "/opt/NaturalGrounding-Tiktok-Ying-Video-Manager/VIDEOS"
+
+[[ports]]
+internal = 850
+publish_default = true
+description = "NaturalGrounding WebUI"
+env_key = "NATURALGROUNDING_PORT"
+
+[[env]]
+key = "HOST"
+default = "0.0.0.0"
+description = "Bind host"
+shared_group = "bind_host"
+aliases = ["NATURALGROUNDING_HOST"]
+
+[[env]]
+key = "NATURALGROUNDING_PORT"
+default = "850"
+description = "NaturalGrounding WebUI port"
+aliases = ["APP_PORT", "PORT"]
+
+[[env]]
+key = "DB_HOST"
+default = "127.0.0.1"
+description = "MariaDB host"
+
+[[env]]
+key = "DB_PORT"
+default = "3306"
+description = "MariaDB port"
+
+[[env]]
+key = "DB_NAME"
+default = "NaturalGrounding-Tiktok-Ying-Video-Manager"
+description = "MariaDB database name"
+
+[[env]]
+key = "DB_USER"
+default = "NaturalGrounding-Tiktok-Ying-Video-Manager"
+description = "MariaDB username"
+
+[[env]]
+key = "DB_PW"
+default = ""
+description = "MariaDB password"
+required = true
+
+[[env]]
+key = "NG_CONFIG_FILE"
+default = "/opt/NaturalGrounding-Tiktok-Ying-Video-Manager/config/db_config.env"
+description = "Optional legacy DB config file path"
+
+[[env]]
+key = "VIDEOS_DIR"
+default = "/opt/NaturalGrounding-Tiktok-Ying-Video-Manager/VIDEOS"
+description = "Video storage directory"

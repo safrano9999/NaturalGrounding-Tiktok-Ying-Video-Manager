@@ -4,10 +4,12 @@
 # SQL-Logik in der Datenbank, Shell nur für Dateien
 # =============================================================================
 
-source ./config/db_config.env
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/runtime_env.sh
+source "$SCRIPT_DIR/lib/runtime_env.sh"
 
 do_sql() {
-    mariadb -h "$DB_HOST" -u "$DB_USER" -p"$DB_PW" "$DB_NAME" "$@"
+    mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PW" "$DB_NAME" "$@"
 }
 
 echo "======================================================="
@@ -92,7 +94,7 @@ do_sql -e "CALL get_cleanup_summary();"
 
 echo ""
 echo "💾 Speicherplatz:"
-du -sh VIDEOS/ 2>/dev/null || echo "VIDEOS/ leer"
+du -sh "$VIDEOS_DIR" 2>/dev/null || echo "VIDEOS/ leer"
 
 echo ""
 echo "ℹ️  DB-Einträge bleiben erhalten → Kein Re-Download!"

@@ -18,21 +18,15 @@ NC='\033[0m' # No Color
 # =============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_FILE="${SCRIPT_DIR}/config/db_config.env"
-
-if [[ ! -f "$CONFIG_FILE" ]]; then
-    echo -e "${RED}ERROR: Configuration file not found: $CONFIG_FILE${NC}" >&2
-    exit 1
-fi
-
-source "$CONFIG_FILE"
+# shellcheck source=lib/runtime_env.sh
+source "$SCRIPT_DIR/lib/runtime_env.sh"
 
 # =============================================================================
 # HELPER FUNCTIONS
 # =============================================================================
 
 do_sql() {
-    mariadb -h "$DB_HOST" -u "$DB_USER" -p"$DB_PW" "$DB_NAME" -N -s -e "$1" 2>/dev/null
+    mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PW" "$DB_NAME" -N -s -e "$1" 2>/dev/null
 }
 
 print_header() {
@@ -68,9 +62,9 @@ echo "Timestamp: $(date '+%Y-%m-%d %H:%M:%S')"
 # -----------------------------------------------------------------------------
 print_header "1. Database Connection"
 
-if mariadb -h "$DB_HOST" -u "$DB_USER" -p"$DB_PW" "$DB_NAME" -e "SELECT 1" &>/dev/null; then
+if mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PW" "$DB_NAME" -e "SELECT 1" &>/dev/null; then
     print_ok "Database connection successful"
-    DB_VERSION=$(mariadb -h "$DB_HOST" -u "$DB_USER" -p"$DB_PW" -N -s -e "SELECT VERSION();")
+    DB_VERSION=$(mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PW" -N -s -e "SELECT VERSION();")
     echo "   Server: $DB_HOST | Version: $DB_VERSION"
 else
     print_error "Database connection FAILED"

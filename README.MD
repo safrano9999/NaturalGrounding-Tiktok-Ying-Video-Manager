@@ -118,3 +118,27 @@ systemctl --user start NG
 ## 📖 Reference
 
 Rion Williams - *Natural Grounding Package Guide*, Dreamcore Productions, 2007
+
+---
+
+## 🏰 REPOS / CITADEL Integration
+
+This repository can be consumed as a REPOS module and mounted by the CITADEL gateway.
+
+Repository-local integration files:
+
+- `CONTAINER/module.toml` — module metadata, ports, env prompts, persistence
+- `CONTAINER/runtime.toml` — supervisor runtime for the FastAPI WebUI
+- `CONTAINER/env_example` — env template for REPOS/container runs
+- `webui.py` + `functions/core.py` — small CITADEL-discoverable service dashboard
+- `lib/runtime_env.sh` — loads DB settings from REPOS env first, legacy `config/db_config.env` second
+
+Runtime defaults:
+
+- WebUI: `NATURALGROUNDING_PORT=850`
+- Persistent paths:
+  - `/opt/NaturalGrounding-Tiktok-Ying-Video-Manager/config`
+  - `/opt/NaturalGrounding-Tiktok-Ying-Video-Manager/VIDEOS`
+
+When selected through REPOS, CITADEL discovers the cloned sibling repo via
+`CONTAINER/module.toml` + `webui.py` and mounts it at `/naturalgrounding`.
