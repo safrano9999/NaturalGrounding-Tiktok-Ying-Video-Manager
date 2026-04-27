@@ -30,6 +30,11 @@ from jinja2 import Environment, FileSystemLoader
 import core
 import api
 
+from pydantic import BaseModel
+from fastapi import BackgroundTasks
+import live
+import db
+
 app = FastAPI(title="NaturalGrounding")
 
 _static = BASE_DIR / "static"
@@ -61,6 +66,36 @@ def api_status():
 def api_videos(status: str = Query("sehr_gut,gut,e3"), mode: str = Query("any")):
     return api.get_videos(status, mode)
 
+
+
+class RateRequest(BaseModel):
+    video_id: str
+    account: str
+    tiktok_url: str
+    rating: str
+
+@app.get("/api/live/queue")
+def api_live_queue(limit: int = 3):
+    return live.fetch_live_batch(limit)
+
+@app.post("/api/live/rate")
+def api_live_rate(req: RateRequest, background_tasks: BackgroundTasks):
+    valid_ratings = ['sehr_gut', 'gut', 'e3']
+    if req.rating in valid_ratings:
+        # Save as non-physical so it doesn't show up in discovery again while downloading
+        db.execute(
+            "INSERT INTO videos (video_id, account, status, is_physical, init_ytdlp) VALUES (%s, %s, %s, 0, 1) ON DUPLICATE KEY UPDATE status=%s",
+            (req.video_id, req.account, req.rating, req.rating)
+        )
+        background_tasks.add_task(live.download_rated_video, req.video_id, req.account, req.tiktok_url, req.rating)
+        return {"status": "downloading"}
+    elif req.rating == 'unbrauchbar':
+        db.execute(
+            "INSERT INTO videos (video_id, account, status, is_physical, init_ytdlp) VALUES (%s, %s, %s, 0, 1) ON DUPLICATE KEY UPDATE status=%s",
+            (req.video_id, req.account, 'unbrauchbar', 'unbrauchbar')
+        )
+        return {"status": "ignored"}
+    return {"status": "skipped"}
 
 @app.get("/api/health")
 def api_health():

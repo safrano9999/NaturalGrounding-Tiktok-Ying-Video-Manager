@@ -16,7 +16,7 @@ main { flex: 1; overflow: auto; padding: 28px; max-width: 1200px; margin: 0 auto
 .sub { color:var(--muted); margin-bottom:24px; font-size: 14px; }
 .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:14px; }
 .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom: 14px; }
-.label { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.06em; }
+.label { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.06em; margin-bottom:6px; }
 .value { font-size:24px; font-weight:700; margin-top:6px; }
 .ok { color:var(--ok); } .bad { color:var(--bad); }
 ul { padding-left:20px; } code, pre { background:#0b0f15; border:1px solid var(--line); border-radius:10px; }
@@ -24,13 +24,13 @@ pre { padding:14px; overflow:auto; }
 a { color:var(--blue); }
 
 /* Player styles */
-#player-view { display: none; height: 100%; flex-direction: column; }
-.player-container { display: flex; gap: 20px; height: calc(100vh - 140px); }
-.video-wrapper { flex: 1; background: #000; border-radius: 14px; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+#player-view { display: none; height: 100%; flex-direction: column; padding: 20px; }
+.player-container { display: flex; gap: 20px; height: calc(100vh - 120px); }
+.video-wrapper { flex: 1; background: #000; border-radius: 14px; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative; }
 video { width: 100%; height: 100%; object-fit: contain; }
-.sidebar { width: 320px; display: flex; flex-direction: column; gap: 14px; }
+.sidebar { width: 340px; display: flex; flex-direction: column; gap: 14px; }
 .controls { display: flex; flex-direction: column; gap: 10px; }
-select, button.btn { width: 100%; padding: 8px 12px; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); color: var(--text); }
+select, button.btn { width: 100%; padding: 8px 12px; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); color: var(--text); box-sizing: border-box; }
 button.btn { background: var(--line); cursor: pointer; font-weight: bold; }
 button.btn:hover { background: var(--active); border-color: var(--active); }
 .playlist { flex: 1; overflow-y: auto; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 8px; }
@@ -38,6 +38,11 @@ button.btn:hover { background: var(--active); border-color: var(--active); }
 .playlist-item:hover { background: var(--line); }
 .playlist-item.active { background: var(--active); border-color: var(--active); }
 .meta { font-size: 11px; color: var(--muted); margin-top: 4px; }
+.live-badge { background: #f0883e; color: #000; font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: bold; margin-left: 6px; }
+
+/* Rate Buttons */
+.rate-btn { flex: 1 1 45%; border: none; padding: 8px 0; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; color: #000; }
+.rate-btn:hover { filter: brightness(1.1); }
 </style>
 </head>
 <body>
@@ -67,40 +72,59 @@ button.btn:hover { background: var(--active); border-color: var(--active); }
   </section>
 </main>
 
-<main id="player-view" style="display: none; padding: 20px;">
+<main id="player-view">
   <div class="player-container">
     <div class="video-wrapper">
-      <video id="video-player" controls autoplay>
-        Your browser does not support HTML5 video.
-      </video>
+      <video id="video-player" controls autoplay></video>
     </div>
     
     <div class="sidebar">
       <div class="card controls" style="margin-bottom:0;">
-        <div class="label">Modus Auswahl</div>
-        <select id="filter-status">
-          <option value="sehr_gut,gut,e3">Alle positiven (Sehr gut, Gut, E3)</option>
-          <option value="sehr_gut">Nur Sehr gut 🌟</option>
-          <option value="gut">Nur Gut ✅</option>
-          <option value="e3">Nur E3 🎭</option>
-          <option value="pending">Ungesichtet (Pending)</option>
-          <option value="unbrauchbar">Unbrauchbar ❌</option>
-          <option value="all">Komplettes Archiv</option>
+        <div class="label">Ansicht Modus</div>
+        <select id="play-mode" onchange="togglePlayMode()">
+          <option value="archive">Archiv (Lokal gespeichert)</option>
+          <option value="live">Live Discovery (TikTok Stream)</option>
         </select>
+        <hr style="border:0; border-top:1px solid var(--line); margin:4px 0;">
         
-        <select id="filter-mode">
-          <option value="any">Alle Flags (Mode 1 & 2 egal)</option>
-          <option value="mode1">Nur Mode 1</option>
-          <option value="mode2">Nur Mode 2</option>
-        </select>
+        <!-- Archiv Controls -->
+        <div id="archive-controls">
+          <select id="filter-status" style="margin-bottom:10px;">
+            <option value="sehr_gut,gut,e3">Alle positiven (Sehr gut, Gut, E3)</option>
+            <option value="sehr_gut">Nur Sehr gut 🌟</option>
+            <option value="gut">Nur Gut ✅</option>
+            <option value="e3">Nur E3 🎭</option>
+            <option value="pending">Ungesichtet (Pending)</option>
+            <option value="unbrauchbar">Unbrauchbar ❌</option>
+            <option value="all">Komplettes Archiv</option>
+          </select>
+          <select id="filter-mode" style="margin-bottom:10px;">
+            <option value="any">Alle Flags (Mode 1 & 2 egal)</option>
+            <option value="mode1">Nur Mode 1</option>
+            <option value="mode2">Nur Mode 2</option>
+          </select>
+          <button class="btn" onclick="loadArchivePlaylist()">Playliste laden</button>
+        </div>
         
-        <button class="btn" onclick="loadPlaylist()">Playliste laden</button>
+        <!-- Live Controls -->
+        <div id="live-controls" style="display:none;">
+          <button class="btn" onclick="fetchLiveQueue()">Neue Live-Streams suchen</button>
+          
+          <div id="live-actions" style="margin-top:14px; display:none; flex-wrap:wrap; gap:6px;">
+            <div class="label" style="width:100%;">Bewerten & Speichern:</div>
+            <button class="rate-btn" style="background:#45c46f;" onclick="rateLive('sehr_gut')">🌟 Sehr Gut</button>
+            <button class="rate-btn" style="background:#65a9ff;" onclick="rateLive('gut')">✅ Gut</button>
+            <button class="rate-btn" style="background:#f0883e;" onclick="rateLive('e3')">🎭 E3</button>
+            <button class="rate-btn" style="background:#ff6b6b;" onclick="rateLive('unbrauchbar')">❌ Unbrauchbar</button>
+            <button class="rate-btn" style="background:var(--line); color:var(--text); flex-basis:100%;" onclick="rateLive('skip')">⏭ Überspringen (nicht speichern)</button>
+          </div>
+        </div>
       </div>
       
-      <div class="card" style="flex:1; display:flex; flex-direction:column; padding:10px; margin-bottom:0;">
-        <div class="label" style="margin-bottom:8px;">Wiedergabeliste (<span id="pl-count">0</span>)</div>
+      <div class="card" style="flex:1; display:flex; flex-direction:column; padding:10px; margin-bottom:0; min-height:0;">
+        <div class="label" style="margin-bottom:8px;">Liste (<span id="pl-count">0</span>)</div>
         <div class="playlist" id="playlist-container">
-          <div style="color:var(--muted); font-size:13px; text-align:center; margin-top:20px;">Wähle einen Modus und lade die Playliste.</div>
+          <div style="color:var(--muted); font-size:13px; text-align:center; margin-top:20px;">Wähle einen Modus und lade die Liste.</div>
         </div>
       </div>
     </div>
@@ -115,11 +139,29 @@ function switchTab(tab) {
   document.getElementById('btn-player').className = tab === 'player' ? 'active' : '';
 }
 
+let playMode = 'archive';
 let currentPlaylist = [];
 let currentIndex = -1;
 const player = document.getElementById('video-player');
 
-async function loadPlaylist() {
+function togglePlayMode() {
+  playMode = document.getElementById('play-mode').value;
+  document.getElementById('archive-controls').style.display = playMode === 'archive' ? 'block' : 'none';
+  document.getElementById('live-controls').style.display = playMode === 'live' ? 'block' : 'none';
+  
+  currentPlaylist = [];
+  currentIndex = -1;
+  document.getElementById('playlist-container').innerHTML = '';
+  document.getElementById('pl-count').innerText = '0';
+  document.getElementById('live-actions').style.display = 'none';
+  player.src = '';
+  
+  // Natural Grounding live videos loop until rated. Local archive auto-advances.
+  player.loop = (playMode === 'live');
+}
+
+// --- ARCHIVE LOGIC ---
+async function loadArchivePlaylist() {
   const status = document.getElementById('filter-status').value;
   const mode = document.getElementById('filter-mode').value;
   
@@ -137,14 +179,14 @@ async function loadPlaylist() {
       return;
     }
     
-    renderPlaylist();
+    renderArchivePlaylist();
     playVideo(0);
   } catch (err) {
     document.getElementById('playlist-container').innerHTML = `<div style="color:var(--bad); padding:10px;">Fehler: ${err.message}</div>`;
   }
 }
 
-function renderPlaylist() {
+function renderArchivePlaylist() {
   const container = document.getElementById('playlist-container');
   container.innerHTML = '';
   
@@ -152,10 +194,8 @@ function renderPlaylist() {
     const div = document.createElement('div');
     div.className = `playlist-item ${idx === currentIndex ? 'active' : ''}`;
     div.id = `pl-item-${idx}`;
-    div.onclick = () => playVideo(idx);
+    div.onclick = () => { if(playMode==='archive') playVideo(idx); };
     
-    // rel_path in DB is like "VIDEOS/account/123.mp4". We strip "VIDEOS/" to get filename
-    const filename = v.rel_path.replace('VIDEOS/', '');
     const flags = [];
     if (v.mode1) flags.push('M1');
     if (v.mode2) flags.push('M2');
@@ -172,7 +212,6 @@ function renderPlaylist() {
 function playVideo(index) {
   if (index < 0 || index >= currentPlaylist.length) return;
   
-  // Remove active class from old item
   if (currentIndex >= 0 && document.getElementById(`pl-item-${currentIndex}`)) {
     document.getElementById(`pl-item-${currentIndex}`).classList.remove('active');
   }
@@ -180,29 +219,110 @@ function playVideo(index) {
   currentIndex = index;
   const v = currentPlaylist[index];
   
-  // Add active class
   const activeItem = document.getElementById(`pl-item-${currentIndex}`);
   if (activeItem) {
     activeItem.classList.add('active');
     activeItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
   
-  // Determine URL. FastAPI static mount is at /videos, and maps directly to VIDEOS_DIR.
-  // DB rel_path starts with "VIDEOS/". So we replace "VIDEOS/" with "/videos/".
-  let urlPath = v.rel_path;
-  if (urlPath.startsWith('VIDEOS/')) {
-    urlPath = '/videos/' + urlPath.substring(7);
+  if (playMode === 'archive') {
+    let urlPath = v.rel_path;
+    if (urlPath.startsWith('VIDEOS/')) {
+      urlPath = '/videos/' + urlPath.substring(7);
+    } else {
+      urlPath = '/' + urlPath;
+    }
+    player.src = urlPath;
+    document.getElementById('live-actions').style.display = 'none';
   } else {
-    urlPath = '/' + urlPath; // fallback
+    // Live mode
+    player.src = v.stream_url;
+    document.getElementById('live-actions').style.display = 'flex';
   }
   
-  player.src = urlPath;
   player.play().catch(e => console.error("Autoplay prevented:", e));
 }
 
-// Auto-play next video when current ends
-player.addEventListener('ended', () => {
+// --- LIVE DISCOVERY LOGIC ---
+async function fetchLiveQueue() {
+  document.getElementById('playlist-container').innerHTML = '<div style="color:var(--muted); text-align:center; margin-top:20px;">Lade Streams via yt-dlp...<br><small>Das dauert ein paar Sekunden.</small></div>';
+  document.getElementById('live-actions').style.display = 'none';
+  
+  try {
+    const res = await fetch('/api/live/queue');
+    const data = await res.json();
+    
+    if (data.error) throw new Error(data.error);
+    
+    // Add to current playlist, or replace if we want fresh
+    currentPlaylist = data.videos || [];
+    document.getElementById('pl-count').innerText = currentPlaylist.length;
+    
+    if (currentPlaylist.length === 0) {
+      document.getElementById('playlist-container').innerHTML = '<div style="color:var(--muted); text-align:center; margin-top:20px;">Keine neuen Videos für aktive Accounts gefunden.</div>';
+      return;
+    }
+    
+    renderLivePlaylist();
+    playVideo(0);
+  } catch(e) {
+    document.getElementById('playlist-container').innerHTML = `<div style="color:var(--bad); padding:10px;">Fehler: ${e.message}</div>`;
+  }
+}
+
+function renderLivePlaylist() {
+  const container = document.getElementById('playlist-container');
+  container.innerHTML = '';
+  
+  currentPlaylist.forEach((v, idx) => {
+    const div = document.createElement('div');
+    div.className = `playlist-item ${idx === currentIndex ? 'active' : ''}`;
+    div.id = `pl-item-${idx}`;
+    // No direct click to jump in live mode to force rating
+    
+    const desc = v.description.length > 30 ? v.description.substring(0, 30) + '...' : v.description;
+    
+    div.innerHTML = `
+      <div><strong>@${v.account}</strong> <span class="live-badge">LIVE</span></div>
+      <div class="meta">${v.duration}s | ${desc}</div>
+    `;
+    container.appendChild(div);
+  });
+}
+
+async function rateLive(rating) {
+  if (playMode !== 'live' || currentIndex < 0 || currentIndex >= currentPlaylist.length) return;
+  const v = currentPlaylist[currentIndex];
+  
+  document.getElementById('live-actions').style.display = 'none';
+  
+  try {
+    await fetch('/api/live/rate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        video_id: v.video_id,
+        account: v.account,
+        tiktok_url: v.tiktok_url,
+        rating: rating
+      })
+    });
+  } catch(e) {
+    console.error("Rating failed", e);
+  }
+  
+  // Advance to next live video
   if (currentIndex < currentPlaylist.length - 1) {
+    playVideo(currentIndex + 1);
+  } else {
+    // Queue empty, fetch more automatically
+    fetchLiveQueue();
+  }
+}
+
+// Auto-play next video when current ends (ARCHIVE ONLY)
+player.addEventListener('ended', () => {
+  if (playMode === 'archive' && currentIndex < currentPlaylist.length - 1) {
     playVideo(currentIndex + 1);
   }
 });
