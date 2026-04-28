@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""Interactive configuration using prettyconfig."""
+"""Interactive configuration using prettyconfi."""
 
 import sys
 from pathlib import Path
 
 try:
-    import prettyconfig
+    import prettyconfi
 except ImportError:
-    print("Error: prettyconfig not installed. Run: pip install prettyconfig[cli]")
+    print("Error: prettyconfi not installed. Run: pip install prettyconfi[cli]")
     sys.exit(1)
 
 def main():
@@ -21,13 +21,13 @@ def main():
     print("   NATURAL GROUNDING VIDEO MANAGER - CONFIGURATION")
     print("=======================================================\n")
     
-    schemas = prettyconfig.load_schemas([schema_path])
-    composed = prettyconfig.compose(schemas)
+    schemas = prettyconfi.load_schemas([schema_path])
+    composed = prettyconfi.compose(schemas)
     
-    runner = prettyconfig.CLIRunner(composed)
+    runner = prettyconfi.CLIRunner(composed)
     answers = runner.run()
     
-    prettyconfig.to_env(answers, out_path)
+    prettyconfi.to_env(answers, out_path)
     print(f"\n✓ Configuration saved to {out_path.relative_to(Path.cwd())}")
 
 if __name__ == "__main__":
