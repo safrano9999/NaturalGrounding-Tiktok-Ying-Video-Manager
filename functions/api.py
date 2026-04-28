@@ -20,8 +20,8 @@ def get_videos(status_filter: str, mode_filter: str):
     elif mode_filter == 'mode2':
         query += " AND mode2 = 1"
         
-    # Order randomly for a fresh playlist feel, or by ID
-    query += " ORDER BY RAND() LIMIT 200"
+    # Backend-specific random function (MySQL/MariaDB: RAND, PostgreSQL: RANDOM)
+    query += f" ORDER BY {db.random_order_sql()} LIMIT 200"
     
     videos = db.query(query, params)
     return {"videos": videos}

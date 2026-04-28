@@ -89,21 +89,38 @@ def sync_video(info_dict, filepath):
         db.execute("INSERT INTO accounts (username, is_valid) VALUES (%s, 1)", (v_user,))
         print(f"Added account: @{v_user}")
         
-    sql = """
-        INSERT INTO videos (
-            video_id, duration, width, height, view_count,
-            upload_date, description, rel_path, account,
-            init_ytdlp, id_zeitpunkt_ytdlp, status, is_physical
-        ) VALUES (
-            %s, %s, %s, %s, %s,
-            %s, %s, %s, %s,
-            1, NOW(), 'pending', 1
-        ) ON DUPLICATE KEY UPDATE
-            view_count = VALUES(view_count),
-            id_zeitpunkt_ytdlp = NOW(),
-            is_physical = 1,
-            description = VALUES(description)
-    """
+    if db.db_backend_name() == "postgresql":
+        sql = """
+            INSERT INTO videos (
+                video_id, duration, width, height, view_count,
+                upload_date, description, rel_path, account,
+                init_ytdlp, id_zeitpunkt_ytdlp, status, is_physical
+            ) VALUES (
+                %s, %s, %s, %s, %s,
+                %s, %s, %s, %s,
+                1, NOW(), 'pending', 1
+            ) ON CONFLICT (video_id) DO UPDATE SET
+                view_count = EXCLUDED.view_count,
+                id_zeitpunkt_ytdlp = NOW(),
+                is_physical = EXCLUDED.is_physical,
+                description = EXCLUDED.description
+        """
+    else:
+        sql = """
+            INSERT INTO videos (
+                video_id, duration, width, height, view_count,
+                upload_date, description, rel_path, account,
+                init_ytdlp, id_zeitpunkt_ytdlp, status, is_physical
+            ) VALUES (
+                %s, %s, %s, %s, %s,
+                %s, %s, %s, %s,
+                1, NOW(), 'pending', 1
+            ) ON DUPLICATE KEY UPDATE
+                view_count = VALUES(view_count),
+                id_zeitpunkt_ytdlp = NOW(),
+                is_physical = 1,
+                description = VALUES(description)
+        """
     db.execute(sql, (
         v_id, v_dur, v_width, v_height, v_views,
         v_date, v_desc, rel_path, v_user

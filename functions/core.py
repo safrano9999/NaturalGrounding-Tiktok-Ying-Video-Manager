@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import subprocess
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -38,26 +37,43 @@ def dashboard() -> dict:
         "video_count": _count_files(VIDEOS_DIR, ".mp4"),
         "json_count": _count_files(VIDEOS_DIR, ".info.json"),
         "db": {
-            "host": _env("DB_HOST", "127.0.0.1"),
-            "port": _env("DB_PORT", "3306"),
-            "name": _env("DB_NAME", "NaturalGrounding-Tiktok-Ying-Video-Manager"),
-            "user": _env("DB_USER", "NaturalGrounding-Tiktok-Ying-Video-Manager"),
+            "backend": _env("DB_BACKEND", "postgres"),
+            "host": _env("DB_HOST", "localhost"),
+            "port": _env("DB_PORT", "5432"),
+            "name": _env("DB_NAME", "build"),
+            "user": _env("DB_USER", "build"),
             "password_set": bool(_env("DB_PW")),
         },
         "scripts": scripts,
     }
 
 def run_health_check(timeout: int = 20) -> dict:
-    script = BASE_DIR / "NATURAL_HEALTH_CHECK.sh"
-    if not script.is_file():
-        return {"ok": False, "returncode": 127, "output": "NATURAL_HEALTH_CHECK.sh not found"}
-    proc = subprocess.run(
-        ["bash", str(script)],
-        cwd=str(BASE_DIR),
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        timeout=timeout,
-        check=False,
-    )
-    return {"ok": proc.returncode == 0, "returncode": proc.returncode, "output": proc.stdout[-8000:]}
+    # Python-native healthcheck for the web UI path (no shell dependency).
+    import db
+
+    checks: list[str] = []
+    ok = True
+
+    if not VIDEOS_DIR.is_dir():
+        ok = False
+        checks.append(f"videos_dir missing: {VIDEOS_DIR}")
+    else:
+        checks.append(f"videos_dir ok: {VIDEOS_DIR}")
+
+    try:
+        value = db.query_scalar("SELECT 1")
+        if str(value) in {"1", "1.0"} or value == 1:
+            checks.append("db ok: SELECT 1")
+        else:
+            ok = False
+            checks.append(f"db unexpected scalar: {value!r}")
+    except Exception as exc:
+        ok = False
+        checks.append(f"db error: {exc}")
+
+    return {
+        "ok": ok,
+        "returncode": 0 if ok else 1,
+        "output": "\n".join(checks)[-8000:],
+        "timeout": timeout,
+    }

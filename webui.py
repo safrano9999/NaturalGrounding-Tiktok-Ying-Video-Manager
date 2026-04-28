@@ -82,20 +82,35 @@ def api_live_queue(limit: int = 3):
 
 @app.post("/api/live/rate")
 def api_live_rate(req: RateRequest, background_tasks: BackgroundTasks):
+    if db.db_backend_name() == "postgresql":
+        upsert_sql = (
+            "INSERT INTO videos (video_id, account, status, is_physical, init_ytdlp) "
+            "VALUES (%s, %s, %s, 0, 1) "
+            "ON CONFLICT (video_id) DO UPDATE SET "
+            "account = EXCLUDED.account, status = EXCLUDED.status, "
+            "is_physical = EXCLUDED.is_physical, init_ytdlp = EXCLUDED.init_ytdlp"
+        )
+    else:
+        upsert_sql = (
+            "INSERT INTO videos (video_id, account, status, is_physical, init_ytdlp) "
+            "VALUES (%s, %s, %s, 0, 1) "
+            "ON DUPLICATE KEY UPDATE status=%s"
+        )
+
     valid_ratings = ['sehr_gut', 'gut', 'e3']
     if req.rating in valid_ratings:
         # Save as non-physical so it doesn't show up in discovery again while downloading
-        db.execute(
-            "INSERT INTO videos (video_id, account, status, is_physical, init_ytdlp) VALUES (%s, %s, %s, 0, 1) ON DUPLICATE KEY UPDATE status=%s",
-            (req.video_id, req.account, req.rating, req.rating)
-        )
+        args = (req.video_id, req.account, req.rating, req.rating)
+        if db.db_backend_name() == "postgresql":
+            args = (req.video_id, req.account, req.rating)
+        db.execute(upsert_sql, args)
         background_tasks.add_task(live.download_rated_video, req.video_id, req.account, req.tiktok_url, req.rating)
         return {"status": "downloading"}
     elif req.rating == 'unbrauchbar':
-        db.execute(
-            "INSERT INTO videos (video_id, account, status, is_physical, init_ytdlp) VALUES (%s, %s, %s, 0, 1) ON DUPLICATE KEY UPDATE status=%s",
-            (req.video_id, req.account, 'unbrauchbar', 'unbrauchbar')
-        )
+        args = (req.video_id, req.account, 'unbrauchbar', 'unbrauchbar')
+        if db.db_backend_name() == "postgresql":
+            args = (req.video_id, req.account, 'unbrauchbar')
+        db.execute(upsert_sql, args)
         return {"status": "ignored"}
     return {"status": "skipped"}
 

@@ -2,27 +2,33 @@ schema_version = 1
 schema_name = "naturalgrounding"
 
 [[fields]]
+key = "DB_BACKEND"
+type = "str"
+default = "postgres"
+label = "DB Backend (postgres/mysql)"
+
+[[fields]]
 key = "DB_HOST"
 type = "str"
-default = "127.0.0.1"
+default = "localhost"
 label = "Database Host"
 
 [[fields]]
 key = "DB_PORT"
 type = "port"
-default = 3306
+default = 5432
 label = "Database Port"
 
 [[fields]]
 key = "DB_NAME"
 type = "str"
-default = "NaturalGrounding-Tiktok-Ying-Video-Manager"
+default = "build"
 label = "Database Name"
 
 [[fields]]
 key = "DB_USER"
 type = "str"
-default = "NaturalGrounding-Tiktok-Ying-Video-Manager"
+default = "build"
 label = "Database User"
 
 [[fields]]

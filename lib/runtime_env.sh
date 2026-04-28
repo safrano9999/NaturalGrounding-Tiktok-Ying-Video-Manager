@@ -9,7 +9,7 @@ if [[ -z "${SCRIPT_DIR:-}" ]]; then
 fi
 
 CONFIG_FILE="${NG_CONFIG_FILE:-$SCRIPT_DIR/config/db_config.env}"
-_RUNTIME_KEYS=(DB_HOST DB_PORT DB_NAME DB_USER DB_PW VIDEOS_DIR NG_CONFIG_FILE)
+_RUNTIME_KEYS=(DB_BACKEND DB_HOST DB_PORT DB_NAME DB_USER DB_PW VIDEOS_DIR NG_CONFIG_FILE)
 
 # Preserve env injected by REPOS/container before sourcing a legacy file.
 for key in "${_RUNTIME_KEYS[@]}"; do
@@ -35,10 +35,11 @@ for key in "${_RUNTIME_KEYS[@]}"; do
 done
 unset key pre _RUNTIME_KEYS
 
-: "${DB_HOST:=127.0.0.1}"
-: "${DB_PORT:=3306}"
-: "${DB_NAME:=NaturalGrounding-Tiktok-Ying-Video-Manager}"
-: "${DB_USER:=NaturalGrounding-Tiktok-Ying-Video-Manager}"
+: "${DB_BACKEND:=postgres}"
+: "${DB_HOST:=localhost}"
+: "${DB_PORT:=5432}"
+: "${DB_NAME:=build}"
+: "${DB_USER:=build}"
 : "${VIDEOS_DIR:=$SCRIPT_DIR/VIDEOS}"
 
 missing=()

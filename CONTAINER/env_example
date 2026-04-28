@@ -1,9 +1,10 @@
 HOST=0.0.0.0
 NATURALGROUNDING_PORT=850
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_NAME=NaturalGrounding-Tiktok-Ying-Video-Manager
-DB_USER=NaturalGrounding-Tiktok-Ying-Video-Manager
+DB_BACKEND=postgres
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=build
+DB_USER=build
 DB_PW=change-me
 NG_CONFIG_FILE=/opt/NaturalGrounding-Tiktok-Ying-Video-Manager/config/db_config.env
 VIDEOS_DIR=/opt/NaturalGrounding-Tiktok-Ying-Video-Manager/VIDEOS

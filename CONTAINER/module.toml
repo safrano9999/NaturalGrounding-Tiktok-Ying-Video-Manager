@@ -37,29 +37,36 @@ description = "NaturalGrounding WebUI port"
 aliases = ["APP_PORT", "PORT"]
 
 [[env]]
+key = "DB_BACKEND"
+default = "postgres"
+description = "postgres or mysql"
+
+[[env]]
 key = "DB_HOST"
-default = "127.0.0.1"
-description = "MariaDB host"
+default = "localhost"
+description = "Database host"
 
 [[env]]
 key = "DB_PORT"
-default = "3306"
-description = "MariaDB port"
+default = "5432"
+description = "Database port"
+default_from = "DB_BACKEND"
+default_map = { mysql = "3306", mariadb = "3306", postgres = "5432", postgresql = "5432" }
 
 [[env]]
 key = "DB_NAME"
-default = "NaturalGrounding-Tiktok-Ying-Video-Manager"
-description = "MariaDB database name"
+default = "build"
+description = "Database name"
 
 [[env]]
 key = "DB_USER"
-default = "NaturalGrounding-Tiktok-Ying-Video-Manager"
-description = "MariaDB username"
+default = "build"
+description = "Database user"
 
 [[env]]
 key = "DB_PW"
 default = ""
-description = "MariaDB password"
+description = "Database password"
 required = true
 
 [[env]]

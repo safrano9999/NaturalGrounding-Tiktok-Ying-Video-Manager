@@ -4,3 +4,4 @@ jinja2>=3.1
 python-dotenv>=1.0
 yt-dlp
 pymysql
+psycopg[binary]
