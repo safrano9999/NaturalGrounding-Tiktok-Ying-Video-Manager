@@ -2,7 +2,10 @@ import os
 import random
 from pathlib import Path
 import yt_dlp
-from . import db
+try:
+    from . import db
+except ImportError:
+    import db
 
 VIDEOS_DIR = Path(os.environ.get("VIDEOS_DIR", Path(__file__).resolve().parent.parent / "VIDEOS"))
 

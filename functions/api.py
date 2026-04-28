@@ -1,4 +1,7 @@
-from . import db
+try:
+    from . import db
+except ImportError:
+    import db
 
 def get_videos(status_filter: str, mode_filter: str):
     # Parse status
