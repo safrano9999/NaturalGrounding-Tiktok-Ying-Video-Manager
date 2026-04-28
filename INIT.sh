@@ -23,11 +23,11 @@ mkdir -p config VIDEOS tmp
 if [[ ! -f "config/db_config.env" ]]; then
     echo -e "${YELLOW}No config found. Creating from template...${NC}"
 
-    if command -v python3 &>/dev/null && python3 -c "import prettyconfig" 2>/dev/null; then
-        echo -e "${GREEN}Starting interactive setup (powered by prettyconfig)...${NC}"
+    if command -v python3 &>/dev/null && python3 -c "import prettyconfi" 2>/dev/null; then
+        echo -e "${GREEN}Starting interactive setup (powered by prettyconfi)...${NC}"
         python3 configure.py
     else
-        echo -e "${YELLOW}prettyconfig not found. Creating default template...${NC}"
+        echo -e "${YELLOW}prettyconfi not found (install package: prettyconfi[cli]). Creating default template...${NC}"
         if [[ -f "config/db_config.env.example" ]]; then
             cp config/db_config.env.example config/db_config.env
         else

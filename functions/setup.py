@@ -2,11 +2,11 @@ import os
 from pathlib import Path
 
 try:
-    import prettyconfig
-    from prettyconfig.web import WebRunner
-    PRETTYCONFIG_AVAILABLE = True
+    import prettyconfi
+    from prettyconfi.web import WebRunner
+    PRETTYCONFI_AVAILABLE = True
 except ImportError:
-    PRETTYCONFIG_AVAILABLE = False
+    PRETTYCONFI_AVAILABLE = False
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 CONFIG_DIR = BASE_DIR / "config"
@@ -14,12 +14,12 @@ SCHEMA_PATH = CONFIG_DIR / "setup.toml"
 ENV_PATH = CONFIG_DIR / "db_config.env"
 
 def get_schema_data():
-    if not PRETTYCONFIG_AVAILABLE:
-        return {"error": "prettyconfig not installed."}
+    if not PRETTYCONFI_AVAILABLE:
+        return {"error": "prettyconfi not installed."}
     
     try:
-        schemas = prettyconfig.load_schemas([SCHEMA_PATH])
-        composed = prettyconfig.compose(schemas)
+        schemas = prettyconfi.load_schemas([SCHEMA_PATH])
+        composed = prettyconfi.compose(schemas)
         schema_json = WebRunner.to_json_schema(composed)
         
         # Merge existing values if present
@@ -40,19 +40,19 @@ def get_schema_data():
         return {"error": str(e)}
 
 def save_config(data: dict):
-    if not PRETTYCONFIG_AVAILABLE:
-        return {"error": "prettyconfig not installed."}, 500
+    if not PRETTYCONFI_AVAILABLE:
+        return {"error": "prettyconfi not installed."}, 500
         
     try:
-        schemas = prettyconfig.load_schemas([SCHEMA_PATH])
-        composed = prettyconfig.compose(schemas)
+        schemas = prettyconfi.load_schemas([SCHEMA_PATH])
+        composed = prettyconfi.compose(schemas)
         
         answers, errors = WebRunner.validate(composed, data)
         if errors:
             return {"errors": errors}, 400
             
         CONFIG_DIR.mkdir(exist_ok=True)
-        prettyconfig.to_env(answers, ENV_PATH)
+        prettyconfi.to_env(answers, ENV_PATH)
         
         return {"status": "ok", "message": "Configuration saved."}, 200
     except Exception as e:

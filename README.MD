@@ -40,8 +40,8 @@ The new WebUI acts as a drop-in service module for the `CITADEL` Gateway, runnin
   Assembles playlists on the fly based on the user's active filters (e.g., specific tags, rating status). Returns a shuffled JSON queue to the frontend player.
 * **`functions/core.py`**: 
   Provides telemetry, file counts, database connection checks, and health-status endpoints for the CITADEL dashboard.
-* **`functions/setup.py` & `configure.py` (`prettyconfig`)**: 
-  Powered by the `prettyconfig` library. Defines the configuration schema once (`config/setup.toml`) and uses it to render both an interactive CLI setup wizard (`configure.py`) and an automatic Web Setup form if credentials are missing upon first boot.
+* **`functions/setup.py` & `configure.py` (`prettyconfi`)**: 
+  Powered by the `prettyconfi` library. Defines the configuration schema once (`config/setup.toml`) and uses it to render both an interactive CLI setup wizard (`configure.py`) and an automatic Web Setup form if credentials are missing upon first boot.
 
 ### 🖥️ 2. The Classic Bash CLI (`NATURAL_*.sh`)
 

@@ -82,7 +82,7 @@ button.btn:hover { background: var(--active); border-color: var(--active); }
 
 <main id="setup-view">
   <div class="card" style="max-width: 600px; margin: 0 auto;">
-    <h2 style="margin-top:0; color:var(--blue);">Datenbank & Verzeichnisse (powered by prettyconfig)</h2>
+    <h2 style="margin-top:0; color:var(--blue);">Datenbank & Verzeichnisse (powered by prettyconfi)</h2>
     <div class="sub">Konfiguriere die Anbindung an deine MariaDB und das Video-Verzeichnis.</div>
     
     <div id="setup-loading" style="color:var(--muted);">Lade Setup Schema...</div>
@@ -174,7 +174,7 @@ function switchTab(tab) {
   switchTab('setup');
 {% endif %}
 
-// --- SETUP LOGIC (PRETTYCONFIG) ---
+// --- SETUP LOGIC (PRETTYCONFI) ---
 async function loadSetupSchema() {
   const loading = document.getElementById('setup-loading');
   const errorDiv = document.getElementById('setup-error');
@@ -297,7 +297,7 @@ async function saveSetup(e) {
       
       result.errors.forEach(err => {
         // Errors are usually strings. Try to match to fields (rudimentary)
-        // In a real app, prettyconfig would return structured errors
+        // In a real app, prettyconfi would return structured errors
         const errDiv = document.createElement('div');
         errDiv.style.color = 'var(--bad)';
         errDiv.style.fontSize = '12px';
